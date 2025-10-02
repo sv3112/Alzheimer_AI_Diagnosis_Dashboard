@@ -10,8 +10,4 @@ pillow==11.0.0
 requests==2.31.0
 xgboost==3.0.2
 shap==0.47.2
-tensorflow==2.18.0
-torch==2.5.1
-transformers==4.48.1
-sentence-transformers==3.4.1
-streamlit_lottie==latest
+streamlit-lottie
