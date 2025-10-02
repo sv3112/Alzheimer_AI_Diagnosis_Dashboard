@@ -1,6 +1,6 @@
 streamlit==1.46.0
 pandas==2.2.3
-numpy==1.26.4
+numpy>=2.1.0
 matplotlib==3.10.0
 plotly==6.1.2
 scikit-learn==1.6.0
@@ -10,6 +10,5 @@ pillow==11.0.0
 requests==2.31.0
 xgboost==3.0.2
 shap==0.47.2
-streamlit-lottie
+streamlit-lottie==0.0.5
 tensorflow==2.20.0
-
