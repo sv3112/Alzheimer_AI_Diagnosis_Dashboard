@@ -76,42 +76,58 @@ from alzheimers_db_setup import AlzheimerPredictionStorage  # DB setup for stori
 # 📁 Hardcoded paths for models and results
 # ------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SHAP_UTILITY_PATH = os.path.join(BASE_DIR, "..", "shap_utils.py")
 
 BASE_DIR = Path("/tmp/alzheimer_app")
 BASE_DIR.mkdir(exist_ok=True, parents=True)
 
-
-
-# S3 configuration
 S3_BUCKET = "alzheimersmodelfiles"
-CSV_MODEL_KEY = "alzheimers_model_files.zip"  # Adjust if your model is zipped
+CSV_MODEL_PREFIX = "alzheimers_model_files/"  # prefix (folder path)
 IMAGE_MODEL_KEY = "alzheimer_model_4class.keras"
 
-# Local paths to save the downloaded models
-CSV_MODEL_PATH = BASE_DIR / "alzheimers_model_files"
+CSV_MODEL_DIR = BASE_DIR / "alzheimers_model_files"
 IMAGE_MODEL_PATH = BASE_DIR / "alzheimer_model_4class.keras"
-
-
 
 aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
 aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+aws_region = os.getenv("AWS_DEFAULT_REGION", "eu-north-1")
 
+if not aws_access_key_id or not aws_secret_access_key:
+    st.error("❌ AWS credentials not found.")
+    st.stop()
 
-# Initialize S3 client explicitly
 s3 = boto3.client(
     "s3",
     aws_access_key_id=aws_access_key_id,
     aws_secret_access_key=aws_secret_access_key,
-    
+    region_name=aws_region
 )
 
-# Download models from S3 if they don't already exist locally
-if not CSV_MODEL_PATH.exists():
-    s3.download_file(S3_BUCKET, CSV_MODEL_KEY, str(CSV_MODEL_PATH))
+def download_folder_from_s3(bucket, prefix, local_dir):
+    """Download entire S3 folder to local_dir."""
+    st.info(f"📂 Downloading folder '{prefix}' from S3...")
+    local_dir.mkdir(parents=True, exist_ok=True)
+    paginator = s3.get_paginator('list_objects_v2')
+    for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+        for obj in page.get('Contents', []):
+            key = obj['Key']
+            if key.endswith('/'):  # skip folders
+                continue
+            rel_path = key[len(prefix):]
+            local_path = local_dir / rel_path
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            st.info(f"⬇️ {rel_path}")
+            s3.download_file(bucket, key, str(local_path))
+    st.success(f"✅ Folder '{prefix}' downloaded to {local_dir}")
+
+# Download folder and image model
+if not CSV_MODEL_DIR.exists():
+    download_folder_from_s3(S3_BUCKET, CSV_MODEL_PREFIX, CSV_MODEL_DIR)
 
 if not IMAGE_MODEL_PATH.exists():
+    st.info("⬇️ Downloading Keras model...")
     s3.download_file(S3_BUCKET, IMAGE_MODEL_KEY, str(IMAGE_MODEL_PATH))
-SHAP_UTILITY_PATH = os.path.join(BASE_DIR, "..", "shap_utils.py")
+    st.success(f"✅ Downloaded {IMAGE_MODEL_PATH.name}")
 
 # ------------------------------
 # 🖼️ Image analysis constants
