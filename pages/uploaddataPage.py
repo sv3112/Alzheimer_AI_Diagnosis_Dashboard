@@ -139,8 +139,9 @@ keras_file_key = ["alzheimer_model_4class.keras"]
 # ------------------------------
 # Local directories
 # ------------------------------
-pkl_local_dir = "./alzheimers_model_files"
-keras_local_dir = "./"
+pkl_local_dir = os.path.join(BASE_DIR, "alzheimers_model_files")
+keras_local_dir = str(BASE_DIR)
+IMAGE_MODEL_PATH = os.path.join(keras_local_dir, "alzheimer_model_4class.keras")
 
 # ------------------------------
 # Download files
