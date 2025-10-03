@@ -25,22 +25,31 @@ class AlzheimerPredictionStorage:
     - store_image_with_metadata() - for storing analysis images
     - close() - for cleanup
     """
-    
-    def __init__(self, base_dir="/Users/swehavenkateshwari/F416664_Alzheimers_AI_Diagnosis/Alzheimer_Project/Alzheimer_Database"):
 
-
-        """Initialize the storage system with only essential tables"""
-        self.base_dir = Path(base_dir)
+    def __init__(self, base_dir=None):
+        """
+        Initialize the storage system with only essential tables.
+        Works both locally and on Render.
+        """
+        # Use relative path if no base_dir provided
+        if base_dir is None:
+            BASE_DIR = Path(__file__).resolve().parent.parent  # Project root
+            self.base_dir = BASE_DIR / "Alzheimer_Database"
+        else:
+            self.base_dir = Path(base_dir)
+        
         self.images_dir = self.base_dir / "stored_images"
         self.db_path = self.base_dir / "alzheimer_predictions.db"
         
-        # Create directories
+        # Create directories safely
         self.base_dir.mkdir(exist_ok=True, parents=True)
         self.images_dir.mkdir(exist_ok=True)
         
-        # Initialize database
+        # Initialize SQLite database
         self.conn = sqlite3.connect(str(self.db_path))
         self.conn.execute("PRAGMA journal_mode=WAL")
+        
+        # Create tables
         self._create_tables()
     
     def _create_tables(self):
