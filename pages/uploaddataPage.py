@@ -1,3 +1,4 @@
+
 # uploaddatapage.py - Upload Data Page
 """
 Streamlit Upload Data Page for Alzheimer's Disease Prediction
@@ -19,70 +20,155 @@ This file is intended to be run within the Streamlit application framework:
 # ------------------------------
 # 📦 Core imports
 # ------------------------------
-import os  # For file system operations
-import warnings  # For controlling warning messages
-from datetime import datetime  # For timestamping and date-time operations
+import os
+import warnings
+from datetime import datetime
 
 # ------------------------------
 # 📊 Data and scientific libraries
 # ------------------------------
-import pandas as pd  # type: ignore # Data manipulation and analysis
-import numpy as np  # type: ignore # Numerical operations and arrays
-import joblib  # type: ignore # Save/load Python objects like ML models
-import time  # Time-related functions (e.g., measuring execution time)
+import pandas as pd
+import numpy as np
+import joblib
+import time
+from pathlib import Path
+import boto3
 
 # ------------------------------
 # 🧪 Machine learning & deep learning
 # ------------------------------
-from tensorflow.keras.models import load_model  # type: ignore # Load pre-trained Keras deep learning models
-import shap  # type: ignore # SHAP for model interpretability and explainability
+from tensorflow.keras.models import load_model
+import shap
 
 # ------------------------------
 # 🖼️ Image processing
 # ------------------------------
-import cv2  # type: ignore # OpenCV for computer vision tasks
-from PIL import Image  # type: ignore # Image loading and processing
+import cv2
+from PIL import Image
 
 # ------------------------------
 # 📈 Visualization
 # ------------------------------
-import matplotlib # type: ignore
-matplotlib.use('Agg')  # Non-interactive backend suitable for Streamlit
-import matplotlib.pyplot as plt  # type: ignore # Standard plotting library
-import plotly.express as px  # type: ignore # Easy interactive plotting
-import plotly.graph_objects as go  # type: ignore # Customizable interactive plots
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import plotly.express as px
+import plotly.graph_objects as go
 
 # ------------------------------
 # 🌐 Streamlit & extras
 # ------------------------------
-import streamlit as st  # type: ignore # Web app framework for ML dashboards
-from streamlit_lottie import st_lottie  # type: ignore # Animate Lottie JSON animations in Streamlit
+import streamlit as st
+from streamlit_lottie import st_lottie
 
 # ------------------------------
 # ⚙️ System and import utilities
 # ------------------------------
-import importlib.util  # For dynamically importing modules
+import importlib.util
 
 # ------------------------------
 # 🔕 Suppress warnings
 # ------------------------------
-warnings.filterwarnings('ignore')  # Ignore all warnings for clean output
-from style import *  # Custom styling for Streamlit app
-from alzheimers_db_setup import AlzheimerPredictionStorage  # DB setup for storing predictions
+warnings.filterwarnings('ignore')
+from style import *
+from alzheimers_db_setup import AlzheimerPredictionStorage
 
 # ------------------------------
-# 📁 Hardcoded paths for models and results
+# 📁 Setup base directory
 # ------------------------------
-CSV_MODEL_PATH = "/Users/swehavenkateshwari/F416664_Alzheimers_AI_Diagnosis/alzheimers_model_files"
-IMAGE_MODEL_PATH = "/Users/swehavenkateshwari/F416664_Alzheimers_AI_Diagnosis/alzheimer_model_4class.keras"
-SHAP_UTILITY_PATH = "/Users/swehavenkateshwari/F416664_Alzheimers_AI_Diagnosis/shap_utils.py"
-RESULTS_DIR = "/Users/swehavenkateshwari/F416664_Alzheimers_AI_Diagnosis/Results"
+BASE_DIR = Path("/tmp/alzheimer_app")
+BASE_DIR.mkdir(exist_ok=True, parents=True)
+
+SHAP_UTILITY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shap_utils.py")
+
+# ------------------------------
+# AWS credentials
+# ------------------------------
+AWS_ACCESS_KEY_ID = "AKIAYXKBWOBSSS7COPUY"
+AWS_SECRET_ACCESS_KEY = "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"
+AWS_DEFAULT_REGION = "eu-north-1"
+
+s3 = boto3.client(
+    's3',
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+    region_name=AWS_DEFAULT_REGION
+)
+
+# ------------------------------
+# Function to download multiple files - FIXED VERSION
+# ------------------------------
+def download_files_from_s3(bucket_name, file_keys, local_dir):
+    """
+    Downloads multiple files from S3 without requiring ListBucket permission.
+    Preserves folder structure from S3 keys.
+    """
+    for key in file_keys:
+        # Create full local path preserving folder structure
+        local_path = os.path.join(local_dir, key)
+        
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(local_path), exist_ok=True)
+        
+        if os.path.exists(local_path):
+            print(f"✅ Already exists: {local_path}")
+            continue
+        try:
+            s3.download_file(bucket_name, key, local_path)
+            print(f"⬇️ Downloaded {key} → {local_path}")
+        except Exception as e:
+            print(f"❌ Failed to download {key}: {e}")
+
+# ------------------------------
+# S3 bucket and files
+# ------------------------------
+bucket_name = "alzheimersmodelfiles"
+
+# PKL files - with folder prefix as they exist in S3
+pkl_file_keys = [
+    "alzheimers_model_files/alzheimers_best_model.pkl",
+    "alzheimers_model_files/alzheimers_feature_names_processed.pkl",
+    "alzheimers_model_files/alzheimers_model_performance.pkl",
+    "alzheimers_model_files/alzheimers_preprocessor_top10.pkl",
+    "alzheimers_model_files/alzheimers_shap_explainer.pkl",
+    "alzheimers_model_files/alzheimers_top10_features.pkl"
+]
+
+# Keras model - at root level in S3
+keras_file_key = ["alzheimer_model_4class.keras"]
+
+# ------------------------------
+# Local directories (use absolute paths for reliability)
+# ------------------------------
+# Download to BASE_DIR, which will create alzheimers_model_files subfolder automatically
+pkl_local_dir = str(BASE_DIR)
+keras_local_dir = str(BASE_DIR)
+IMAGE_MODEL_PATH = os.path.join(keras_local_dir, "alzheimer_model_4class.keras")
+
+# ------------------------------
+# Download files
+# ------------------------------
+print("Starting file downloads from S3...")
+download_files_from_s3(bucket_name, pkl_file_keys, pkl_local_dir)
+download_files_from_s3(bucket_name, keras_file_key, keras_local_dir)
+
+# Verify downloads
+print(f"\n📁 Verifying downloaded files:")
+print(f"BASE_DIR: {BASE_DIR}")
+print(f"BASE_DIR exists: {BASE_DIR.exists()}")
+if BASE_DIR.exists():
+    print(f"Contents: {list(BASE_DIR.iterdir())}")
+    
+model_files_dir = BASE_DIR / "alzheimers_model_files"
+if model_files_dir.exists():
+    print(f"\nModel files directory: {model_files_dir}")
+    print(f"Model files: {list(model_files_dir.iterdir())}")
 
 # ------------------------------
 # 🖼️ Image analysis constants
 # ------------------------------
-IMG_SIZE = 331  # Image size for CNN input
-CLASS_NAMES = ['Mild Demented', 'Moderate Demented', 'Non Demented', 'Very Mild Demented']  # Alzheimer classes
+IMG_SIZE = 331
+CLASS_NAMES = ['Mild Demented', 'Moderate Demented', 'Non Demented', 'Very Mild Demented']
 
 # ------------------------------
 # 🔧 Load utilities once at module level
@@ -90,17 +176,12 @@ CLASS_NAMES = ['Mild Demented', 'Moderate Demented', 'Non Demented', 'Very Mild 
 @st.cache_resource
 def load_utilities():
     """Load and cache SHAP utilities for explainability"""
-    # Dynamically import SHAP utility module from file path
     spec = importlib.util.spec_from_file_location("shap_utility", SHAP_UTILITY_PATH)
     shap_utility = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(shap_utility)
-    
     return shap_utility
 
-# Load SHAP utilities
 shap_utility = load_utilities()
-
-# Import specific function for easier access
 create_shap_analysis_results = shap_utility.create_shap_analysis_results
 
 # ------------------------------
@@ -117,7 +198,7 @@ except ImportError as e:
 # ------------------------------
 # 🎨 Apply custom CSS styles
 # ------------------------------
-apply_custom_css()  # Apply global custom styles to Streamlit app
+apply_custom_css()
 
 # ------------------------------
 # ⚙️ Streamlit page configuration
@@ -133,15 +214,15 @@ st.set_page_config(
 # 🧩 Initialize Streamlit session state
 # ------------------------------
 if 'model' not in st.session_state:
-    st.session_state.model = None  # Store ML model
+    st.session_state.model = None
 if 'prediction' not in st.session_state:
-    st.session_state.prediction = None  # Store prediction result
+    st.session_state.prediction = None
 if 'img_array' not in st.session_state:
-    st.session_state.img_array = None  # Store uploaded image array
+    st.session_state.img_array = None
 if 'analysis_complete' not in st.session_state:
-    st.session_state.analysis_complete = False  # Track if analysis is done
+    st.session_state.analysis_complete = False
 if 'data_type' not in st.session_state:
-    st.session_state.data_type = 'csv'  # Track uploaded data type (CSV or image)
+    st.session_state.data_type = 'csv'
 
 # ------------------------------
 # 🏆 Cache hero section
@@ -152,11 +233,10 @@ def create_hero_section():
     st.markdown(f"""
     <div class="hero-section">
         <h1 class="hero-title">🧠 AI-Driven Alzheimer's Diagnosis</h1>
-        <p class="hero-subtitle">Upload your clinical or imaging data and get clear AI-driven Alzheimer’s insights — fast and reliable</p>
+        <p class="hero-subtitle">Upload your clinical or imaging data and get clear AI-driven Alzheimer's insights — fast and reliable</p>
     </div>
     """, unsafe_allow_html=True)
 
-# Display hero section
 create_hero_section()
 
 # ------------------------------
@@ -173,50 +253,38 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Retrieve the current selection from session state; default to 'csv' (clinical data)
 current_data_type = st.session_state.get('data_type', 'csv')
 
 # ------------------------------
 # 🌟 Data Type Buttons
 # ------------------------------
-# Use Streamlit columns to place buttons side by side
 col1, col2 = st.columns(2, gap="large")
 
 with col1:
-    # --------------------------
-    # 📊 Clinical Data Button
-    # --------------------------
-    # Set button style: 'primary' if selected, 'secondary' otherwise
     clinical_button_type = "primary" if current_data_type == 'csv' else "secondary"
     
-    # Render the button for clinical data analysis
     if st.button(
         "📊 Clinical Data Analysis\n\n✨ Binary Classification\n🔍 SHAP Explainability\n🎯 95% Accuracy",
-        key="csv_select",  # Unique key for Streamlit session
-        use_container_width=True,  # Make button full-width in column
-        type=clinical_button_type,  # Apply color/style based on selection
-        help="Analyze clinical data from CSV files"  # Tooltip for guidance
+        key="csv_select",
+        use_container_width=True,
+        type=clinical_button_type,
+        help="Analyze clinical data from CSV files"
     ):
-        st.session_state.data_type = 'csv'  # Update session state
-        st.rerun()  # Refresh app to reflect selection immediately
+        st.session_state.data_type = 'csv'
+        st.rerun()
 
 with col2:
-    # --------------------------
-    # 🧠 Brain Scan Button
-    # --------------------------
-    # Set button style: 'primary' if selected, 'secondary' otherwise
     brain_button_type = "primary" if current_data_type == 'image' else "secondary"
     
-    # Render the button for brain scan image analysis
     if st.button(
         "🧠 Brain Scan Analysis\n\n✨ 4-Stage Classification\n🔍 Grad-CAM & Region Visualization\n🎯 95% Accuracy",
-        key="img_select",  # Unique key for Streamlit session
-        use_container_width=True,  # Full-width in column
-        type=brain_button_type,  # Apply color/style based on selection
-        help="Analyze brain scan images"  # Tooltip for guidance
+        key="img_select",
+        use_container_width=True,
+        type=brain_button_type,
+        help="Analyze brain scan images"
     ):
-        st.session_state.data_type = 'image'  # Update session state
-        st.rerun()  # Refresh app to reflect selection immediately
+        st.session_state.data_type = 'image'
+        st.rerun()
 
 # Simplified button styling
 st.markdown(f"""
@@ -264,14 +332,25 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ------------------------------
-# 💾 Load CSV (clinical data) models
+# 💾 Load CSV (clinical data) models - FIXED VERSION
 # ------------------------------
 @st.cache_resource
 def load_csv_models():
     """Load all required CSV model files for clinical data analysis"""
     try:
+        # Models are now in BASE_DIR/alzheimers_model_files
+        CSV_MODEL_PATH = os.path.join(BASE_DIR, "alzheimers_model_files")
+        
+        # Debug: Print the path and check if directory exists
+        print(f"Looking for models in: {CSV_MODEL_PATH}")
+        print(f"Directory exists: {os.path.exists(CSV_MODEL_PATH)}")
+        if os.path.exists(CSV_MODEL_PATH):
+            print(f"Files in directory: {os.listdir(CSV_MODEL_PATH)}")
+        
         # Load the trained ML model
-        model = joblib.load(os.path.join(CSV_MODEL_PATH, 'alzheimers_best_model.pkl'))
+        model_path = os.path.join(CSV_MODEL_PATH, 'alzheimers_best_model.pkl')
+        print(f"Loading model from: {model_path}")
+        model = joblib.load(model_path)
         
         # Load preprocessing pipeline for top 10 features
         preprocessor = joblib.load(os.path.join(CSV_MODEL_PATH, 'alzheimers_preprocessor_top10.pkl'))
@@ -285,9 +364,11 @@ def load_csv_models():
         # Load processed feature names
         feature_names = joblib.load(os.path.join(CSV_MODEL_PATH, 'alzheimers_feature_names_processed.pkl'))
         
+        print("✅ All models loaded successfully")
         return model, preprocessor, top_features, explainer, feature_names
     
     except Exception as e:
+        print(f"❌ Detailed error loading CSV models: {str(e)}")
         st.error(f"❌ Error loading CSV models: {str(e)}")
         return None, None, None, None, None
 
@@ -302,17 +383,14 @@ def load_alzheimer_model():
     """Load the Alzheimer's CNN classification model for MRI images"""
     try:
         if os.path.exists(IMAGE_MODEL_PATH):
-            # Load pre-trained Keras model without compilation
             model = load_model(IMAGE_MODEL_PATH, compile=False)
             
-            # Compile the model for inference
             model.compile(
                 optimizer='adam',
                 loss='categorical_crossentropy',
                 metrics=['accuracy']
             )
             
-            # Test model with a dummy input to ensure it works
             dummy_input = np.zeros((1, IMG_SIZE, IMG_SIZE, 3), dtype=np.float32)
             _ = model.predict(dummy_input, verbose=0)
             
@@ -331,20 +409,13 @@ def preprocess_image(image, target_size=(331, 331)):
     """Convert uploaded image to model-ready batch"""
     img_array = np.array(image)
     
-    # Convert grayscale images to RGB
     if len(img_array.shape) == 2:
         img_array = cv2.cvtColor(img_array, cv2.COLOR_GRAY2RGB)
-    # Convert RGBA images to RGB
     elif img_array.shape[2] == 4:
         img_array = cv2.cvtColor(img_array, cv2.COLOR_RGBA2RGB)
     
-    # Resize image to target input size
     img_resized = cv2.resize(img_array, target_size)
-    
-    # Normalize pixel values to [0,1]
     img_normalized = img_resized.astype('float32') / 255.0
-    
-    # Add batch dimension
     img_batch = np.expand_dims(img_normalized, axis=0)
     
     return img_batch
@@ -354,12 +425,9 @@ def preprocess_image(image, target_size=(331, 331)):
 # ------------------------------
 def mark_boundaries(img, mask, color=(1, 0, 0), mode='thick'):
     """Overlay boundaries of segmented regions on the original image"""
-    from skimage.segmentation import find_boundaries # type: ignore
+    from skimage.segmentation import find_boundaries
     
-    # Find boundaries in the mask
     boundaries = find_boundaries(mask, mode=mode)
-    
-    # Copy original image and apply boundary color
     marked = img.copy()
     marked[boundaries] = color
     
@@ -374,7 +442,6 @@ st.markdown('<h2 class="section-header">📤 Upload Your Data</h2>', unsafe_allo
 # 🧩 Clinical CSV Upload Section
 # ------------------------------
 if st.session_state.data_type == 'csv':
-    # Informational section with icon, title, and description
     st.markdown("""
         <div class="upload-section">
             <div style="display: flex; align-items: center; justify-content: center; flex-wrap: wrap;">
@@ -389,39 +456,27 @@ if st.session_state.data_type == 'csv':
         </div>
         """, unsafe_allow_html=True)
 
-    # File uploader for CSV clinical data
     uploaded_file = st.file_uploader(
         "Choose a CSV file", 
         type='csv',
         help="Upload a CSV file with patient data containing all required clinical features"
     )
     
-    # ------------------------------
-    # ⚙️ Process Uploaded CSV
-    # ------------------------------
     if uploaded_file is not None:
-        # Show spinner while loading models and preparing pipeline
         with st.spinner("🤖 Initializing AI models and preparing analysis pipeline..."):
             model, preprocessor, top_features, explainer, feature_names = load_csv_models()
         
-        # Error handling if models fail to load
         if model is None:
             st.error("Failed to load models. Please check the configuration.")
         else:
             try:
-                # Read uploaded CSV into pandas DataFrame
                 data = pd.read_csv(uploaded_file)
                 
-                # ------------------------------
-                # 📈 Data Overview Metrics
-                # ------------------------------
                 st.markdown('<h2 class="section-header">📈 Data Overview</h2>', unsafe_allow_html=True)
                 
-                # Display key metrics in 4 columns
                 col1, col2, col3, col4 = st.columns(4)
                 
                 with col1:
-                    # Total number of patients (rows)
                     st.markdown(f"""
                     <div class="metric-card_D">
                         <div class="metric-value_D">{len(data):,}</div>
@@ -430,7 +485,6 @@ if st.session_state.data_type == 'csv':
                     """, unsafe_allow_html=True)
                 
                 with col2:
-                    # Number of clinical features (columns)
                     st.markdown(f"""
                     <div class="metric-card_D">
                         <div class="metric-value_D">{len(data.columns)}</div>
@@ -439,7 +493,6 @@ if st.session_state.data_type == 'csv':
                     """, unsafe_allow_html=True)
                 
                 with col3:
-                    # Total missing values in dataset
                     missing_total = data.isnull().sum().sum()
                     st.markdown(f"""
                     <div class="metric-card_D">
@@ -449,7 +502,6 @@ if st.session_state.data_type == 'csv':
                     """, unsafe_allow_html=True)
                 
                 with col4:
-                    # Percentage of incomplete data
                     missing_pct = (missing_total / (len(data) * len(data.columns)) * 100)
                     st.markdown(f"""
                     <div class="metric-card_D">
@@ -458,25 +510,17 @@ if st.session_state.data_type == 'csv':
                     </div>
                     """, unsafe_allow_html=True)
                 
-                # ------------------------------
-                # 🔍 Feature Availability Check
-                # ------------------------------
                 available_features = set(data.columns)
                 required_features = set(top_features)
                 missing_features = required_features - available_features
                 
-                # ------------------------------
-                # ⚠️ Check for missing required clinical features
-                # ------------------------------
                 if missing_features:
-                    # Display warning card with missing features
                     st.markdown(f"""
                     <div class="info-card" >
                         <h3 style="color: #DC2626;">⚠️ Missing Required Features</h3>
                         <p style="color: #991B1B;">The following required features are missing from your dataset:</p>
                     """, unsafe_allow_html=True)
                     
-                    # Arrange missing features in 3 columns for readability
                     missing_list = list(missing_features)
                     cols = st.columns(3)
                     for i, feat in enumerate(missing_list):
@@ -485,7 +529,6 @@ if st.session_state.data_type == 'csv':
                     st.markdown("</div>", unsafe_allow_html=True)
 
                 else:
-                    # Display success card when all required features are present
                     st.markdown(" ")
                     st.markdown("""
                     <div class="info-card" >
@@ -494,23 +537,16 @@ if st.session_state.data_type == 'csv':
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # Expandable section to show all validated features
                     with st.expander("📋 View All Clinical Features", expanded=False):
-                        feature_cols = st.columns(4)  # Divide into 4 columns
+                        feature_cols = st.columns(4)
                         for i, feat in enumerate(top_features):
                             feature_cols[i % 4].markdown(f'<span class="status-badge status-success">✓ {feat}</span>', unsafe_allow_html=True)
 
-                # ------------------------------
-                # 🚀 Clinical Data AI Analysis Pipeline
-                # ------------------------------
                 if not missing_features:
-                    # Section header for AI pipeline
                     st.markdown('<h2 class="section-header">🚀 AI Analysis Pipeline for Clinical Data</h2>', unsafe_allow_html=True)
                     
-                    # Timeline container for process steps
                     st.markdown('<div class="process-timeline">', unsafe_allow_html=True)
                     
-                    # Define the steps of the analysis pipeline with icon, title, and description
                     steps = [
                         ("Data Preprocessing", "Clean, normalize, and prepare patient data for optimal model performance.", "🔧"),
                         ("AI Prediction", "Generate Alzheimer's risk predictions using an advanced CatBoost model.", "🤖"),
@@ -519,22 +555,14 @@ if st.session_state.data_type == 'csv':
                         ("Database Storage", "Securely store all analysis results and reports in the database.", "💾"),
                     ]
 
-                    # ------------------------------
-                    # 🔄 Render AI Analysis Pipeline Steps
-                    # ------------------------------
                     for i, (title, desc, icon) in enumerate(steps, 1):
-                        # Each step is displayed as a styled card in the timeline
                         st.markdown(f"""
                         <div class="process-step">
-                            <!-- Step number -->
                             <span class="step-number">{i}</span>
                             
-                            <!-- Step content: icon + title + description -->
                             <div style="display: flex; align-items: start; gap: 2rem;">
-                                <!-- Icon for visual representation -->
                                 <span style="font-size: 2rem;">{icon}</span>
                                 
-                                <!-- Step title and description -->
                                 <div>
                                     <h4 style="margin: 0 0 0.5rem 0; color: #333;">{title}</h4>
                                     <p style="margin: 0; color: #666; line-height: 1;">{desc}</p>
@@ -543,62 +571,39 @@ if st.session_state.data_type == 'csv':
                         </div>
                         """, unsafe_allow_html=True)
 
-                    # Close the timeline container div
                     st.markdown('</div>', unsafe_allow_html=True)
 
-                    # ------------------------------
-                    # 🟢 Main AI Analysis Button
-                    # ------------------------------
-                    # Center the button using 3 columns: empty, button, empty
                     col1, col2, col3 = st.columns([1, 2, 1])
                     with col2:
-                        # Render the main analysis button
                         if st.button(
                             "🧠 Start AI Analysis", 
                             type="primary", 
                             use_container_width=True, 
                             help="Run comprehensive AI analysis with SHAP explanations"
                         ):
-                            # Show a spinner while running the pipeline
                             with st.spinner("🔄 Running comprehensive AI analysis..."):
                                 try:
-                                    # ------------------------------
-                                    # 🔄 Enhanced Progress Tracking
-                                    # ------------------------------
-                                    progress_bar = st.progress(0)  # Progress bar widget
-                                    status_text = st.empty()       # Text placeholder for step updates
+                                    progress_bar = st.progress(0)
+                                    status_text = st.empty()
 
-                                    # ------------------------------
-                                    # Step 1: Preprocess Data
-                                    # ------------------------------
                                     status_text.text("📊 Step 1/4: Preprocessing clinical data...")
                                     progress_bar.progress(25)
-                                    X = data[top_features]                     # Select top 10 features
-                                    X_preprocessed = preprocessor.transform(X)  # Apply preprocessing pipeline
+                                    X = data[top_features]
+                                    X_preprocessed = preprocessor.transform(X)
 
-                                    # ------------------------------
-                                    # Step 2: Generate Predictions
-                                    # ------------------------------
                                     status_text.text("🤖 Step 2/4: Generating AI predictions...")
                                     progress_bar.progress(50)
-                                    predictions = model.predict(X_preprocessed)             # Class predictions
-                                    probabilities = model.predict_proba(X_preprocessed)[:, 1]  # Probability of positive class
+                                    predictions = model.predict(X_preprocessed)
+                                    probabilities = model.predict_proba(X_preprocessed)[:, 1]
 
-                                    # ------------------------------
-                                    # Step 3: Compute SHAP Explanations
-                                    # ------------------------------
                                     status_text.text("🔍 Step 3/4: Computing SHAP explanations...")
                                     progress_bar.progress(75)
-                                    fresh_explainer = shap.TreeExplainer(model)   # Create SHAP explainer
-                                    shap_values = fresh_explainer.shap_values(X_preprocessed)  # Compute SHAP values
+                                    fresh_explainer = shap.TreeExplainer(model)
+                                    shap_values = fresh_explainer.shap_values(X_preprocessed)
 
-                                    # ------------------------------
-                                    # Step 4: Generate Results & Store
-                                    # ------------------------------
                                     status_text.text("📋 Step 4/4: Generating comprehensive report...")
                                     progress_bar.progress(90)
 
-                                    # Generate SHAP analysis results (global + individual)
                                     shap_results = create_shap_analysis_results(
                                         shap_values=shap_values,
                                         predictions=predictions,
@@ -608,14 +613,12 @@ if st.session_state.data_type == 'csv':
                                         data=data
                                     )
 
-                                    # Store global feature importance in database
                                     storage.store_global_importance(
                                         importance_data=shap_results['global_importance'],
                                         model_name='CatBoost',
                                         model_version='v1'
                                     )
 
-                                    # Store individual patient predictions in database
                                     individual_df = shap_results['individual_predictions']
                                     for _, row in individual_df.iterrows():
                                         storage.store_individual_prediction(
@@ -624,24 +627,19 @@ if st.session_state.data_type == 'csv':
                                             model_version='v1'
                                         )
 
-                                    # Complete progress
                                     progress_bar.progress(100)
                                     status_text.empty()
 
-                                    # Close database connection
                                     storage.close()
 
-                                    # Display success message
                                     csv_title = "🎉 Clinical Data Analysis Completed!"
                                     csv_desc = "Your clinical data has been analyzed successfully. You can now view patient-level insights and download reports."
                                     st.markdown(success_message(csv_title, csv_desc), unsafe_allow_html=True)
 
-                                # Catch errors during the analysis pipeline
                                 except Exception as e:
                                     st.error(f"❌ Error during analysis: {str(e)}")
                                     st.exception(e)
 
-            # Catch errors while loading data initially
             except Exception as e:
                 st.error(f"Error loading data: {str(e)}")
 
@@ -836,22 +834,26 @@ else:  # Image upload
                     # 🔥 Initialize ScoreCAM Analyzer
                     # ------------------------------
                     try:
-                        # Dynamically import the ScoreCAM module from a specific file path
-                        import importlib.util
-                        spec = importlib.util.spec_from_file_location(
-                            "scorecam_brain", 
-                            "/Users/swehavenkateshwari/Alzheimer_Project/scorecam.py"  # Update path if needed
-                        )
-                        scorecam_module = importlib.util.module_from_spec(spec)
-                        spec.loader.exec_module(scorecam_module)
-                        
-                        # Access the ScoreCAMBrainAnalysis class from the imported module
-                        ScoreCAMBrainAnalysis = scorecam_module.ScoreCAMBrainAnalysis
-                        
-                        # Initialize analyzer with loaded CNN model and input image size
-                        scorecam_analyzer = ScoreCAMBrainAnalysis(st.session_state.model, IMG_SIZE)
-                        main_status.text("🤖 ScoreCAM analyzer initialized successfully")  # Inform user
-                        
+                      BASE_DIR = Path(__file__).resolve().parent.parent  # Adjust if script is in pages/
+
+                      # 2️⃣ Path to scorecam.py inside the repo
+                      SCORECAM_PATH = BASE_DIR / "scorecam.py"
+                  
+                      # 3️⃣ Dynamically import ScoreCAM module
+                      spec = importlib.util.spec_from_file_location("scorecam_brain", str(SCORECAM_PATH))
+                      scorecam_module = importlib.util.module_from_spec(spec)
+                      spec.loader.exec_module(scorecam_module)
+                  
+                      
+                      # 5️⃣ Access the ScoreCAMBrainAnalysis class
+                      ScoreCAMBrainAnalysis = scorecam_module.ScoreCAMBrainAnalysis
+                  
+                      # 6️⃣ Initialize analyzer with loaded CNN model and input image size
+                      scorecam_analyzer = ScoreCAMBrainAnalysis(st.session_state.model, IMG_SIZE)
+                  
+                      # 7️⃣ Inform user
+                      main_status.text("🤖 ScoreCAM analyzer initialized successfully")
+                    
                     except Exception as init_error:
                         # Stop the app if ScoreCAM initialization fails
                         st.error(f"❌ Failed to initialize ScoreCAM analyzer: {str(init_error)}")
