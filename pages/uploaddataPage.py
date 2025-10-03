@@ -79,90 +79,10 @@ from alzheimers_db_setup import AlzheimerPredictionStorage
 BASE_DIR = Path("/tmp/alzheimer_app")
 BASE_DIR.mkdir(exist_ok=True, parents=True)
 
+MODEL_DIR = BASE_DIR / "alzheimers_model_files"
 SHAP_UTILITY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shap_utils.py")
 
-# ------------------------------
-# AWS credentials
-# ------------------------------
-AWS_ACCESS_KEY_ID = "AKIAYXKBWOBSSS7COPUY"
-AWS_SECRET_ACCESS_KEY = "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"
-AWS_DEFAULT_REGION = "eu-north-1"
 
-s3 = boto3.client(
-    's3',
-    aws_access_key_id=AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-    region_name=AWS_DEFAULT_REGION
-)
-
-# ------------------------------
-# Function to download multiple files - FIXED VERSION
-# ------------------------------
-def download_files_from_s3(bucket_name, file_keys, local_dir):
-    """
-    Downloads multiple files from S3 without requiring ListBucket permission.
-    Preserves folder structure from S3 keys.
-    """
-    for key in file_keys:
-        # Create full local path preserving folder structure
-        local_path = os.path.join(local_dir, key)
-        
-        # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(local_path), exist_ok=True)
-        
-        if os.path.exists(local_path):
-            print(f"✅ Already exists: {local_path}")
-            continue
-        try:
-            s3.download_file(bucket_name, key, local_path)
-            print(f"⬇️ Downloaded {key} → {local_path}")
-        except Exception as e:
-            print(f"❌ Failed to download {key}: {e}")
-
-# ------------------------------
-# S3 bucket and files
-# ------------------------------
-bucket_name = "alzheimersmodelfiles"
-
-# PKL files - with folder prefix as they exist in S3
-pkl_file_keys = [
-    "alzheimers_model_files/alzheimers_best_model.pkl",
-    "alzheimers_model_files/alzheimers_feature_names_processed.pkl",
-    "alzheimers_model_files/alzheimers_model_performance.pkl",
-    "alzheimers_model_files/alzheimers_preprocessor_top10.pkl",
-    "alzheimers_model_files/alzheimers_shap_explainer.pkl",
-    "alzheimers_model_files/alzheimers_top10_features.pkl"
-]
-
-# Keras model - at root level in S3
-keras_file_key = ["alzheimer_model_4class.keras"]
-
-# ------------------------------
-# Local directories (use absolute paths for reliability)
-# ------------------------------
-# Download to BASE_DIR, which will create alzheimers_model_files subfolder automatically
-pkl_local_dir = str(BASE_DIR)
-keras_local_dir = str(BASE_DIR)
-IMAGE_MODEL_PATH = os.path.join(keras_local_dir, "alzheimer_model_4class.keras")
-
-# ------------------------------
-# Download files
-# ------------------------------
-print("Starting file downloads from S3...")
-download_files_from_s3(bucket_name, pkl_file_keys, pkl_local_dir)
-download_files_from_s3(bucket_name, keras_file_key, keras_local_dir)
-
-# Verify downloads
-print(f"\n📁 Verifying downloaded files:")
-print(f"BASE_DIR: {BASE_DIR}")
-print(f"BASE_DIR exists: {BASE_DIR.exists()}")
-if BASE_DIR.exists():
-    print(f"Contents: {list(BASE_DIR.iterdir())}")
-    
-model_files_dir = BASE_DIR / "alzheimers_model_files"
-if model_files_dir.exists():
-    print(f"\nModel files directory: {model_files_dir}")
-    print(f"Model files: {list(model_files_dir.iterdir())}")
 
 # ------------------------------
 # 🖼️ Image analysis constants
