@@ -75,8 +75,27 @@ from alzheimers_db_setup import AlzheimerPredictionStorage  # DB setup for stori
 # ------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-CSV_MODEL_PATH = os.path.join(BASE_DIR, "..", "alzheimers_model_files")
-IMAGE_MODEL_PATH = os.path.join(BASE_DIR, "..", "alzheimer_model_4class.keras")
+BASE_DIR = Path("/tmp/alzheimer_app")
+BASE_DIR.mkdir(exist_ok=True, parents=True)
+
+# S3 configuration
+S3_BUCKET = "alzheimersmodelfiles"
+CSV_MODEL_KEY = "alzheimers_model_files.zip"  # Adjust if your model is zipped
+IMAGE_MODEL_KEY = "alzheimer_model_4class.keras"
+
+# Local paths to save the downloaded models
+CSV_MODEL_PATH = BASE_DIR / "alzheimers_model_files"
+IMAGE_MODEL_PATH = BASE_DIR / "alzheimer_model_4class.keras"
+
+# Initialize S3 client
+s3 = boto3.client("s3")
+
+# Download models from S3 if they don't already exist locally
+if not CSV_MODEL_PATH.exists():
+    s3.download_file(S3_BUCKET, CSV_MODEL_KEY, str(CSV_MODEL_PATH))
+
+if not IMAGE_MODEL_PATH.exists():
+    s3.download_file(S3_BUCKET, IMAGE_MODEL_KEY, str(IMAGE_MODEL_PATH))
 SHAP_UTILITY_PATH = os.path.join(BASE_DIR, "..", "shap_utils.py")
 
 # ------------------------------
