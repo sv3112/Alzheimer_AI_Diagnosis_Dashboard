@@ -96,6 +96,13 @@ if not aws_access_key_id or not aws_secret_access_key:
     st.error("❌ AWS credentials not found.")
     st.stop()
 
+
+
+st.write("AWS_ACCESS_KEY_ID:", os.getenv("AWS_ACCESS_KEY_ID"))
+st.write("AWS_SECRET_ACCESS_KEY exists:", bool(os.getenv("AWS_SECRET_ACCESS_KEY")))
+st.write("AWS_DEFAULT_REGION:", os.getenv("AWS_DEFAULT_REGION"))
+
+
 s3 = boto3.client(
     "s3",
     aws_access_key_id=aws_access_key_id,
