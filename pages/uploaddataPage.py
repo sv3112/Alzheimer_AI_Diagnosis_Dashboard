@@ -340,6 +340,7 @@ st.markdown(f"""
 def load_csv_models():
     """Load all required CSV model files for clinical data analysis"""
     try:
+        CSV_MODEL_PATH = pkl_local_dir 
         # Load the trained ML model
         model = joblib.load(os.path.join(CSV_MODEL_PATH, 'alzheimers_best_model.pkl'))
         
