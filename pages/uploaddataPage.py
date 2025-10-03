@@ -80,6 +80,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = Path("/tmp/alzheimer_app")
 BASE_DIR.mkdir(exist_ok=True, parents=True)
 
+
+
 # S3 configuration
 S3_BUCKET = "alzheimersmodelfiles"
 CSV_MODEL_KEY = "alzheimers_model_files.zip"  # Adjust if your model is zipped
@@ -89,8 +91,19 @@ IMAGE_MODEL_KEY = "alzheimer_model_4class.keras"
 CSV_MODEL_PATH = BASE_DIR / "alzheimers_model_files"
 IMAGE_MODEL_PATH = BASE_DIR / "alzheimer_model_4class.keras"
 
-# Initialize S3 client
-s3 = boto3.client("s3")
+
+
+aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
+aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+
+
+# Initialize S3 client explicitly
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id=aws_access_key_id,
+    aws_secret_access_key=aws_secret_access_key,
+    
+)
 
 # Download models from S3 if they don't already exist locally
 if not CSV_MODEL_PATH.exists():
