@@ -837,22 +837,26 @@ else:  # Image upload
                     # 🔥 Initialize ScoreCAM Analyzer
                     # ------------------------------
                     try:
-                        # Dynamically import the ScoreCAM module from a specific file path
-                        import importlib.util
-                        spec = importlib.util.spec_from_file_location(
-                            "scorecam_brain", 
-                            "/Users/swehavenkateshwari/Alzheimer_Project/scorecam.py"  # Update path if needed
-                        )
-                        scorecam_module = importlib.util.module_from_spec(spec)
-                        spec.loader.exec_module(scorecam_module)
-                        
-                        # Access the ScoreCAMBrainAnalysis class from the imported module
-                        ScoreCAMBrainAnalysis = scorecam_module.ScoreCAMBrainAnalysis
-                        
-                        # Initialize analyzer with loaded CNN model and input image size
-                        scorecam_analyzer = ScoreCAMBrainAnalysis(st.session_state.model, IMG_SIZE)
-                        main_status.text("🤖 ScoreCAM analyzer initialized successfully")  # Inform user
-                        
+                      BASE_DIR = Path(__file__).resolve().parent.parent  # Adjust if script is in pages/
+
+                      # 2️⃣ Path to scorecam.py inside the repo
+                      SCORECAM_PATH = BASE_DIR / "scorecam.py"
+                  
+                      # 3️⃣ Dynamically import ScoreCAM module
+                      spec = importlib.util.spec_from_file_location("scorecam_brain", str(SCORECAM_PATH))
+                      scorecam_module = importlib.util.module_from_spec(spec)
+                      spec.loader.exec_module(scorecam_module)
+                  
+                      
+                      # 5️⃣ Access the ScoreCAMBrainAnalysis class
+                      ScoreCAMBrainAnalysis = scorecam_module.ScoreCAMBrainAnalysis
+                  
+                      # 6️⃣ Initialize analyzer with loaded CNN model and input image size
+                      scorecam_analyzer = ScoreCAMBrainAnalysis(st.session_state.model, IMG_SIZE)
+                  
+                      # 7️⃣ Inform user
+                      main_status.text("🤖 ScoreCAM analyzer initialized successfully")
+                    
                     except Exception as init_error:
                         # Stop the app if ScoreCAM initialization fails
                         st.error(f"❌ Failed to initialize ScoreCAM analyzer: {str(init_error)}")
