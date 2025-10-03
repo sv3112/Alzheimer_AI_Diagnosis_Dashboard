@@ -81,60 +81,72 @@ SHAP_UTILITY_PATH = os.path.join(BASE_DIR, "..", "shap_utils.py")
 BASE_DIR = Path("/tmp/alzheimer_app")
 BASE_DIR.mkdir(exist_ok=True, parents=True)
 
-S3_BUCKET = "alzheimersmodelfiles"
-CSV_MODEL_PREFIX = "alzheimers_model_files/"  # prefix (folder path)
-IMAGE_MODEL_KEY = "alzheimer_model_4class.keras"
+import boto3
+import os
 
-CSV_MODEL_DIR = BASE_DIR / "alzheimers_model_files"
-IMAGE_MODEL_PATH = BASE_DIR / "alzheimer_model_4class.keras"
-
-aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
-aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-aws_region = os.getenv("AWS_DEFAULT_REGION", "eu-north-1")
-
-if not aws_access_key_id or not aws_secret_access_key:
-    st.error("❌ AWS credentials not found.")
-    st.stop()
-
-
-
-st.write("AWS_ACCESS_KEY_ID:", os.getenv("AWS_ACCESS_KEY_ID"))
-st.write("AWS_SECRET_ACCESS_KEY exists:", bool(os.getenv("AWS_SECRET_ACCESS_KEY")))
-st.write("AWS_DEFAULT_REGION:", os.getenv("AWS_DEFAULT_REGION"))
-
+# ------------------------------
+# AWS credentials
+# ------------------------------
+AWS_ACCESS_KEY_ID = "AKIAYXKBWOBSSS7COPUY"
+AWS_SECRET_ACCESS_KEY = "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"
+AWS_DEFAULT_REGION = "eu-north-1"
 
 s3 = boto3.client(
-    "s3",
-    aws_access_key_id=aws_access_key_id,
-    aws_secret_access_key=aws_secret_access_key,
-    region_name=aws_region
+    's3',
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+    region_name=AWS_DEFAULT_REGION
 )
 
-def download_folder_from_s3(bucket, prefix, local_dir):
-    """Download entire S3 folder to local_dir."""
-    st.info(f"📂 Downloading folder '{prefix}' from S3...")
-    local_dir.mkdir(parents=True, exist_ok=True)
-    paginator = s3.get_paginator('list_objects_v2')
-    for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
-        for obj in page.get('Contents', []):
-            key = obj['Key']
-            if key.endswith('/'):  # skip folders
-                continue
-            rel_path = key[len(prefix):]
-            local_path = local_dir / rel_path
-            local_path.parent.mkdir(parents=True, exist_ok=True)
-            st.info(f"⬇️ {rel_path}")
-            s3.download_file(bucket, key, str(local_path))
-    st.success(f"✅ Folder '{prefix}' downloaded to {local_dir}")
+# ------------------------------
+# Function to download multiple files
+# ------------------------------
+def download_files_from_s3(bucket_name, file_keys, local_dir):
+    """
+    Downloads multiple files from S3 without requiring ListBucket permission.
+    """
+    os.makedirs(local_dir, exist_ok=True)
+    
+    for key in file_keys:
+        local_path = os.path.join(local_dir, os.path.basename(key))
+        if os.path.exists(local_path):
+            print(f"✅ Already exists: {local_path}")
+            continue
+        try:
+            s3.download_file(bucket_name, key, local_path)
+            print(f"⬇️ Downloaded {key} → {local_path}")
+        except Exception as e:
+            print(f"❌ Failed to download {key}: {e}")
 
-# Download folder and image model
-if not CSV_MODEL_DIR.exists():
-    download_folder_from_s3(S3_BUCKET, CSV_MODEL_PREFIX, CSV_MODEL_DIR)
+# ------------------------------
+# S3 bucket and files
+# ------------------------------
+bucket_name = "alzheimersmodelfiles"
 
-if not IMAGE_MODEL_PATH.exists():
-    st.info("⬇️ Downloading Keras model...")
-    s3.download_file(S3_BUCKET, IMAGE_MODEL_KEY, str(IMAGE_MODEL_PATH))
-    st.success(f"✅ Downloaded {IMAGE_MODEL_PATH.name}")
+# PKL files
+pkl_file_keys = [
+    "alzheimers_model_files/alzheimers_best_model.pkl",
+    "alzheimers_model_files/alzheimers_feature_names_processed.pkl",
+    "alzheimers_model_files/alzheimers_model_performance.pkl",
+    "alzheimers_model_files/alzheimers_preprocessor_top10.pkl",
+    "alzheimers_model_files/alzheimers_shap_explainer.pkl",
+    "alzheimers_model_files/alzheimers_top10_features.pkl"
+]
+
+# Keras model
+keras_file_key = ["alzheimer_model_4class.keras"]
+
+# ------------------------------
+# Local directories
+# ------------------------------
+pkl_local_dir = "./alzheimers_model_files"
+keras_local_dir = "./"
+
+# ------------------------------
+# Download files
+# ------------------------------
+download_files_from_s3(bucket_name, pkl_file_keys, pkl_local_dir)
+download_files_from_s3(bucket_name, keras_file_key, keras_local_dir)
 
 # ------------------------------
 # 🖼️ Image analysis constants
