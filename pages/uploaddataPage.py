@@ -73,10 +73,11 @@ from alzheimers_db_setup import AlzheimerPredictionStorage  # DB setup for stori
 # ------------------------------
 # 📁 Hardcoded paths for models and results
 # ------------------------------
-CSV_MODEL_PATH = "/Users/swehavenkateshwari/F416664_Alzheimers_AI_Diagnosis/alzheimers_model_files"
-IMAGE_MODEL_PATH = "/Users/swehavenkateshwari/F416664_Alzheimers_AI_Diagnosis/alzheimer_model_4class.keras"
-SHAP_UTILITY_PATH = "/Users/swehavenkateshwari/F416664_Alzheimers_AI_Diagnosis/shap_utils.py"
-RESULTS_DIR = "/Users/swehavenkateshwari/F416664_Alzheimers_AI_Diagnosis/Results"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+CSV_MODEL_PATH = os.path.join(BASE_DIR, "..", "alzheimers_model_files")
+IMAGE_MODEL_PATH = os.path.join(BASE_DIR, "..", "alzheimer_model_4class.keras")
+SHAP_UTILITY_PATH = os.path.join(BASE_DIR, "..", "shap_utils.py")
 
 # ------------------------------
 # 🖼️ Image analysis constants
