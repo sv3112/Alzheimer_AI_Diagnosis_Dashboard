@@ -73,15 +73,59 @@ warnings.filterwarnings('ignore')
 from style import *
 from alzheimers_db_setup import AlzheimerPredictionStorage
 
-# ------------------------------
-# 📁 Setup base directory
-# ------------------------------
-BASE_DIR = Path("/tmp/alzheimer_app")
-BASE_DIR.mkdir(exist_ok=True, parents=True)
+# Add these imports at the top of your file
+import urllib.request
+import ssl
 
-MODEL_DIR = BASE_DIR / "alzheimers_model_files"
-SHAP_UTILITY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shap_utils.py")
+# Add this function before load_csv_models()
+def download_models_from_github():
+    """Download model files from GitHub repository if they don't exist locally"""
+    
+    # GitHub raw content base URL for your repository
+    GITHUB_RAW_URL = "https://raw.githubusercontent.com/sv3112/Alzheimer_AI_Diagnosis_Dashboard/main/alzheimers_model_files"
+    
+    # List of model files to download
+    MODEL_FILES = [
+        'alzheimers_best_model.pkl',
+        'alzheimers_preprocessor_top10.pkl',
+        'alzheimers_top10_features.pkl',
+        'alzheimers_shap_explainer.pkl',
+        'alzheimers_feature_names_processed.pkl'
+    ]
+    
+    # Ensure the model directory exists
+    MODEL_DIR.mkdir(exist_ok=True, parents=True)
+    
+    # Create SSL context to handle HTTPS
+    ssl_context = ssl.create_default_context()
+    
+    print(f"📥 Checking model files in: {MODEL_DIR}")
+    
+    for filename in MODEL_FILES:
+        local_path = MODEL_DIR / filename
+        
+        # Skip if file already exists
+        if local_path.exists():
+            print(f"✅ {filename} already exists")
+            continue
+        
+        # Download from GitHub
+        github_url = f"{GITHUB_RAW_URL}/{filename}"
+        print(f"📥 Downloading {filename} from GitHub...")
+        
+        try:
+            with urllib.request.urlopen(github_url, context=ssl_context) as response:
+                with open(local_path, 'wb') as out_file:
+                    out_file.write(response.read())
+            print(f"✅ Downloaded {filename}")
+        except Exception as e:
+            print(f"❌ Failed to download {filename}: {str(e)}")
+            raise
 
+    print("✅ All model files ready")
+
+
+# Update the load_csv_models() function
 
 
 # ------------------------------
@@ -255,34 +299,37 @@ st.markdown(f"""
 # 💾 Load CSV (clinical data) models - FIXED VERSION
 # ------------------------------
 @st.cache_resource
+
 def load_csv_models():
     """Load all required CSV model files for clinical data analysis"""
     try:
-        # Models are now in BASE_DIR/alzheimers_model_files
-        CSV_MODEL_PATH = os.path.join(BASE_DIR, "alzheimers_model_files")
+        # Download models from GitHub if not present
+        download_models_from_github()
         
-        # Debug: Print the path and check if directory exists
+        # Models are now in BASE_DIR/alzheimers_model_files
+        CSV_MODEL_PATH = MODEL_DIR
+        
         print(f"Looking for models in: {CSV_MODEL_PATH}")
-        print(f"Directory exists: {os.path.exists(CSV_MODEL_PATH)}")
-        if os.path.exists(CSV_MODEL_PATH):
-            print(f"Files in directory: {os.listdir(CSV_MODEL_PATH)}")
+        print(f"Directory exists: {CSV_MODEL_PATH.exists()}")
+        if CSV_MODEL_PATH.exists():
+            print(f"Files in directory: {list(CSV_MODEL_PATH.iterdir())}")
         
         # Load the trained ML model
-        model_path = os.path.join(CSV_MODEL_PATH, 'alzheimers_best_model.pkl')
+        model_path = CSV_MODEL_PATH / 'alzheimers_best_model.pkl'
         print(f"Loading model from: {model_path}")
         model = joblib.load(model_path)
         
         # Load preprocessing pipeline for top 10 features
-        preprocessor = joblib.load(os.path.join(CSV_MODEL_PATH, 'alzheimers_preprocessor_top10.pkl'))
+        preprocessor = joblib.load(CSV_MODEL_PATH / 'alzheimers_preprocessor_top10.pkl')
         
         # Load list of top 10 features
-        top_features = joblib.load(os.path.join(CSV_MODEL_PATH, 'alzheimers_top10_features.pkl'))
+        top_features = joblib.load(CSV_MODEL_PATH / 'alzheimers_top10_features.pkl')
         
         # Load SHAP explainer for interpretability
-        explainer = joblib.load(os.path.join(CSV_MODEL_PATH, 'alzheimers_shap_explainer.pkl'))
+        explainer = joblib.load(CSV_MODEL_PATH / 'alzheimers_shap_explainer.pkl')
         
         # Load processed feature names
-        feature_names = joblib.load(os.path.join(CSV_MODEL_PATH, 'alzheimers_feature_names_processed.pkl'))
+        feature_names = joblib.load(CSV_MODEL_PATH / 'alzheimers_feature_names_processed.pkl')
         
         print("✅ All models loaded successfully")
         return model, preprocessor, top_features, explainer, feature_names
@@ -291,6 +338,7 @@ def load_csv_models():
         print(f"❌ Detailed error loading CSV models: {str(e)}")
         st.error(f"❌ Error loading CSV models: {str(e)}")
         return None, None, None, None, None
+
 
 # Initialize database storage for predictions
 storage = AlzheimerPredictionStorage()
