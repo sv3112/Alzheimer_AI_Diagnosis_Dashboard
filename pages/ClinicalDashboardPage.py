@@ -135,24 +135,64 @@ st.markdown("""
 def load_model_components():
     """
     Load all pre-trained model components needed for predictions.
-
+    Downloads from GitHub if not present locally.
     Returns:
         tuple: (model, preprocessor, feature_names_original, explainer, feature_names_processed)
     """
     try:
-        model_folder = "/Users/swehavenkateshwari/F41666$_Alzheimers_AI_Diagnosis/alzheimers_model_files"
+        # Define paths
+        BASE_DIR = Path("/tmp/alzheimer_app")
+        MODEL_DIR = BASE_DIR / "alzheimers_model_files"
         
-        model = joblib.load(os.path.join(model_folder, 'alzheimers_best_model.pkl'))
-        preprocessor = joblib.load(os.path.join(model_folder, 'alzheimers_preprocessor_top10.pkl'))
-        feature_names_original = joblib.load(os.path.join(model_folder, 'alzheimers_top10_features.pkl'))
-        explainer = joblib.load(os.path.join(model_folder, 'alzheimers_shap_explainer.pkl'))
-        feature_names_processed = joblib.load(os.path.join(model_folder, 'alzheimers_feature_names_processed.pkl'))
+        # Ensure directories exist
+        MODEL_DIR.mkdir(exist_ok=True, parents=True)
+        
+        # GitHub raw content base URL
+        GITHUB_RAW_URL = "https://raw.githubusercontent.com/sv3112/Alzheimer_AI_Diagnosis_Dashboard/main/alzheimers_model_files"
+        
+        # List of model files
+        MODEL_FILES = [
+            'alzheimers_best_model.pkl',
+            'alzheimers_preprocessor_top10.pkl',
+            'alzheimers_top10_features.pkl',
+            'alzheimers_shap_explainer.pkl',
+            'alzheimers_feature_names_processed.pkl'
+        ]
+        
+        # Download files if they don't exist
+        import urllib.request
+        import ssl
+        ssl_context = ssl.create_default_context()
+        
+        for filename in MODEL_FILES:
+            local_path = MODEL_DIR / filename
+            
+            if not local_path.exists():
+                github_url = f"{GITHUB_RAW_URL}/{filename}"
+                print(f"📥 Downloading {filename} from GitHub...")
+                
+                try:
+                    with urllib.request.urlopen(github_url, context=ssl_context) as response:
+                        with open(local_path, 'wb') as out_file:
+                            out_file.write(response.read())
+                    print(f"✅ Downloaded {filename}")
+                except Exception as e:
+                    print(f"❌ Failed to download {filename}: {str(e)}")
+                    raise
+        
+        # Load all components
+        model = joblib.load(MODEL_DIR / 'alzheimers_best_model.pkl')
+        preprocessor = joblib.load(MODEL_DIR / 'alzheimers_preprocessor_top10.pkl')
+        feature_names_original = joblib.load(MODEL_DIR / 'alzheimers_top10_features.pkl')
+        explainer = joblib.load(MODEL_DIR / 'alzheimers_shap_explainer.pkl')
+        feature_names_processed = joblib.load(MODEL_DIR / 'alzheimers_feature_names_processed.pkl')
         
         print("✓ All model components loaded successfully")
         return model, preprocessor, feature_names_original, explainer, feature_names_processed
     
     except Exception as e:
         st.error(f"Error loading model components: {str(e)}")
+        print(f"❌ Detailed error: {str(e)}")
         return None, None, None, None, None
 
 # ============================================================
