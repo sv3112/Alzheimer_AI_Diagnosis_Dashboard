@@ -1,80 +1,95 @@
-# MRIDashboardPage.py - MRI Dashboard Page
-"""
-Streamlit MRI Dashboard for Alzheimer's Disease Prediction
+# MRIDashboardPage.py - MRI Dashboard with GitHub Database Configuration
 
-This module provides an interactive dashboard for analyzing and visualizing
-predictions generated from MRI brain scans:
-
-- **Overview Tab**: Summary of predictions for uploaded MRI scans and patient risk stratification.
-- **Brain Region Importance Analysis**: Highlights regions most relevant to the model's
-  prediction using Grad-CAM visualizations.
-- **Individual Scan Analysis**: Displays predictions, Grad-CAM heatmaps, and interpretable
-  insights for each MRI scan.
-- **Comparative Analysis**: Compare multiple scans to explore differences in predicted risk
-  and salient brain regions.
-
-The dashboard leverages convolutional neural networks (e.g., InceptionV3) and Grad-CAM
-to provide **interpretable, image-based insights** for Alzheimer’s Disease diagnosis.
-
-This file is intended to be run within the Streamlit application framework:
-    streamlit run mridashboard.py
-"""
-
-# ------------------------------
-# 📦 Core imports
-# ------------------------------
 import os
 import sys
 import json
 import warnings
-from datetime import datetime  # For timestamps and logging
+from datetime import datetime
+from pathlib import Path
 
-# ------------------------------
-# 📊 Data and scientific libraries
-# ------------------------------
-import pandas as pd          #type:ignore # Data manipulation and analysis
-import numpy as np            # type: ignore # Numerical computing
+import pandas as pd
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 
-# ------------------------------
-# 📈 Visualization
-# ------------------------------
-import matplotlib # type: ignore # Plotting library
-matplotlib.use('Agg')  # Ensures non-interactive backend for Streamlit (no GUI popups)
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
+import requests
 
-import plotly.express as px   # type: ignore # High-level Plotly interface for quick plotting
-import plotly.graph_objects as go  # type: ignore # Low-level Plotly interface for detailed customization
+warnings.filterwarnings('ignore')
 
-# ------------------------------
-# 🌐 Streamlit & extras
-# ------------------------------
-import streamlit as st        # type: ignore # Streamlit for interactive dashboards
-import requests               # type: ignore # For making HTTP requests (e.g., loading Lottie animations)
+from style import apply_custom_css
+import re
+import time
 
-# ------------------------------
-# 🔕 Suppress warnings
-# ------------------------------
-warnings.filterwarnings('ignore')  # Silence warning messages to keep UI clean
-
-from style import apply_custom_css  # Custom CSS styling for dashboard UI
-import re                           # Regular expressions for pattern matching
-
-import time                         # For delays, timestamps, or refresh intervals
-
-# Apply custom CSS styling across the dashboard
 apply_custom_css()
 
 # ------------------------------
-# ⚙️ Page configuration for Streamlit
+# 🔧 DATABASE CONFIGURATION
+# ------------------------------
+
+def get_project_root():
+    """Get the project root directory dynamically"""
+    current_file = Path(__file__).resolve()
+    # Navigate up to find the project root (contains .git folder or specific marker file)
+    for parent in current_file.parents:
+        if (parent / '.git').exists() or (parent / 'alzheimers_db_setup.py').exists():
+            return parent
+    return current_file.parent
+
+def setup_database_path():
+    """Configure database path from environment or use default GitHub structure"""
+    
+    # Try to get database path from environment variable (most secure)
+    db_path = os.environ.get('ALZHEIMER_DB_PATH')
+    
+    if db_path and os.path.exists(db_path):
+        return db_path
+    
+    # Fallback: Use relative path from GitHub repo structure
+    project_root = get_project_root()
+    
+    # Expected GitHub structure: /Alzheimer_Project/Alzheimer_Database/alzheimer_predictions.db
+    possible_paths = [
+        project_root / 'Alzheimer_Database' / 'alzheimer_predictions.db',
+        project_root / 'Alzheimer_Project' / 'Alzheimer_Database' / 'alzheimer_predictions.db',
+        Path('Alzheimer_Database') / 'alzheimer_predictions.db',
+    ]
+    
+    for path in possible_paths:
+        if path.exists():
+            return str(path)
+    
+    # If no database found, return default path and let user know
+    default_path = project_root / 'Alzheimer_Database' / 'alzheimer_predictions.db'
+    st.warning(f"⚠️ Database not found. Expected at: {default_path}")
+    return str(default_path)
+
+# Add project root to path for imports
+sys.path.insert(0, str(get_project_root()))
+
+# Try to import the database storage class
+try:
+    from alzheimers_db_setup import AlzheimerPredictionStorage
+    DB_AVAILABLE = True
+except ImportError as e:
+    st.error(f"❌ Cannot import database module: {e}")
+    st.info("Make sure 'alzheimers_db_setup.py' is in your repository root")
+    DB_AVAILABLE = False
+
+# ------------------------------
+# ⚙️ Page configuration
 # ------------------------------
 st.set_page_config(
-    page_title="AI-Powered Alzheimer's MRI Analysis Dashboard",  # Browser tab title
-    page_icon="🧠",                                              # Favicon/emoji icon
-    layout="wide",                                               # Use full-width layout
-    initial_sidebar_state="collapsed"                           # Sidebar hidden by default
+    page_title="AI-Powered Alzheimer's MRI Analysis Dashboard",
+    page_icon="🧠",
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
 # ------------------------------
-# 📄 Import clinical explanation utilities (if available)
+# 📄 Clinical explanations import
 # ------------------------------
 try:
     from clinical_explanations import (
@@ -84,34 +99,22 @@ try:
         get_clinical_insights,
         generate_comparative_narrative
     )
-    CLINICAL_FEATURES_AVAILABLE = True  # Flag to indicate clinical features can be used
+    CLINICAL_FEATURES_AVAILABLE = True
 except ImportError:
-    CLINICAL_FEATURES_AVAILABLE = False # Gracefully handle missing clinical_explanations.py
+    CLINICAL_FEATURES_AVAILABLE = False
 
 # ------------------------------
-# 🛡 Session state variables for data refresh control
+# 🛡 Session state initialization
 # ------------------------------
-# These help prevent unnecessary Streamlit reruns and stale data
 if 'prevent_rerun' not in st.session_state:
     st.session_state.prevent_rerun = False
 if 'last_data_check' not in st.session_state:
     st.session_state.last_data_check = 0
-# NOTE: dashboard_cache removed intentionally to ensure data is always fresh
 
 # ------------------------------
-# 🗄 Import custom database storage handler
-# ------------------------------
-sys.path.append('/Users/swehavenkateshwari/F416664_Alzheimers_AI_Diagnosis')  # Add project root to Python path
-from alzheimers_db_setup import AlzheimerPredictionStorage       # Class for storing/retrieving predictions
-
-# ------------------------------
-# 🎞 Helper functions for Lottie animations
+# 🎞 Helper functions for animations
 # ------------------------------
 def load_lottie_url(url: str):
-    """
-    Load a Lottie animation from a given URL.
-    Returns JSON data if successful, else None.
-    """
     try:
         r = requests.get(url, timeout=5)
         if r.status_code != 200:
@@ -120,22 +123,9 @@ def load_lottie_url(url: str):
     except:
         return None
 
-def load_local_brain():
-    """
-    Load a Lottie brain animation from a local file.
-    Returns JSON object if successful, else None.
-    """
-    try:
-        with open("/Users/swehavenkateshwari/Alzheimer/lottie_brain.json", "r") as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"Could not load brain animation: {e}")
-        return None
-
 # ------------------------------
-# 🏆 Hero Section (HTML/CSS styled)
+# 🏆 Hero Section
 # ------------------------------
-# This section introduces the dashboard with a bold title and subtitle.
 st.markdown("""
 <div class="hero-section">
     <h1 class="hero-title">🧠 AI-Powered Alzheimer's MRI Analysis Dashboard</h1>
@@ -143,40 +133,41 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# FIXED: Reduced cache TTL and added cache bypass option
-@st.cache_data(ttl=60, show_spinner="🔄 Loading dashboard data...")  # Cache results for only 60s to avoid stale data
+# ------------------------------
+# 📊 DATA LOADING WITH GITHUB SUPPORT
+# ------------------------------
+
+@st.cache_data(ttl=60, show_spinner="🔄 Loading dashboard data...")
 def load_mri_data_optimized(force_refresh=False):
-    """
-    Load MRI-related data from the database with caching and refresh control.
-    Returns a dictionary containing:
-      - batch_predictions: DataFrame with prediction results
-      - batch_regions: DataFrame with brain region importance scores
-      - stored_images: DataFrame with stored MRI image references
-      - load_timestamp: datetime when data was loaded
-      - total_records: total number of records loaded
-    """
-    start_time = time.time()  # Track load time for performance metrics
+    """Load MRI data from GitHub repository database"""
     
-    # Cache key info (helpful for debugging cache refreshes)
-    cache_info = f"Loading at {datetime.now().strftime('%H:%M:%S')}"
+    if not DB_AVAILABLE:
+        st.error("❌ Database module not available")
+        return {
+            'batch_predictions': pd.DataFrame(),
+            'batch_regions': pd.DataFrame(),
+            'stored_images': pd.DataFrame(),
+            'load_timestamp': datetime.now(),
+            'total_records': 0
+        }
+    
+    start_time = time.time()
     
     try:
-        # Create storage handler instance
-        storage = AlzheimerPredictionStorage()
+        # Get database path (works with GitHub structure)
+        db_path = setup_database_path()
         
-        # ------------------------------
-        # 1️⃣ Load and process batch predictions
-        # ------------------------------
+        # Create storage handler with GitHub-aware path
+        storage = AlzheimerPredictionStorage(db_path=db_path)
+        
+        # Load batch predictions
         try:
             batch_predictions_raw = storage.get_batch_predictions()
             batch_predictions_df = pd.DataFrame(batch_predictions_raw) if batch_predictions_raw else pd.DataFrame()
             
-            print(f"[DEBUG] Loaded {len(batch_predictions_df)} batch predictions at {datetime.now()}")
-            
-            # Clean and normalize confidence values for consistent range [0, 1]
+            # Clean confidence values
             if not batch_predictions_df.empty and 'Confidence' in batch_predictions_df.columns:
                 def clean_confidence_fast(val):
-                    """Parse and standardize confidence values (supports %, decimals, NaNs)."""
                     if pd.isna(val):
                         return 0.0
                     if isinstance(val, str):
@@ -187,10 +178,9 @@ def load_mri_data_optimized(force_refresh=False):
                             return 0.0
                     return float(val) if val <= 1 else float(val) / 100.0
                 
-                # Apply cleaning function efficiently
                 batch_predictions_df['Confidence'] = batch_predictions_df['Confidence'].apply(clean_confidence_fast)
                 
-                # Convert probability columns to numeric
+                # Convert probability columns
                 prob_columns = [
                     'Mild_Demented_Probability',
                     'Moderate_Demented_Probability', 
@@ -201,43 +191,44 @@ def load_mri_data_optimized(force_refresh=False):
                     if col in batch_predictions_df.columns:
                         batch_predictions_df[col] = pd.to_numeric(batch_predictions_df[col], errors='coerce').fillna(0)
         except Exception as e:
-            print(f"Warning: Batch predictions loading failed: {e}")
+            st.warning(f"⚠️ Batch predictions loading failed: {e}")
             batch_predictions_df = pd.DataFrame()
         
-        # ------------------------------
-        # 2️⃣ Load and process batch region importance scores
-        # ------------------------------
+        # Load batch regions
         try:
             batch_regions_raw = storage.get_batch_region()
             batch_regions_df = pd.DataFrame(batch_regions_raw) if batch_regions_raw else pd.DataFrame()
             
-            print(f"[DEBUG] Loaded {len(batch_regions_df)} batch regions at {datetime.now()}")
-            
-            # Convert important numeric columns to numeric values
             if not batch_regions_df.empty:
                 numeric_cols = ['ScoreCAM_Importance_Score', 'ScoreCAM_Importance_Percentage']
                 for col in numeric_cols:
                     if col in batch_regions_df.columns:
                         batch_regions_df[col] = pd.to_numeric(batch_regions_df[col], errors='coerce').fillna(0)
         except Exception as e:
-            print(f"Warning: Batch regions loading failed: {e}")
+            st.warning(f"⚠️ Batch regions loading failed: {e}")
             batch_regions_df = pd.DataFrame()
         
-        # ------------------------------
-        # 3️⃣ Load stored image references
-        # ------------------------------
+        # Load stored images with GitHub-aware paths
         try:
             stored_images_raw = storage.get_stored_images()
             stored_images_df = pd.DataFrame(stored_images_raw) if stored_images_raw else pd.DataFrame()
             
-            print(f"[DEBUG] Loaded {len(stored_images_df)} stored images at {datetime.now()}")
+            # Convert absolute paths to relative GitHub paths
+            if not stored_images_df.empty and 'file_path' in stored_images_df.columns:
+                project_root = get_project_root()
+                
+                def convert_to_relative_path(abs_path):
+                    try:
+                        return str(Path(abs_path).relative_to(project_root))
+                    except:
+                        return abs_path
+                
+                stored_images_df['file_path'] = stored_images_df['file_path'].apply(convert_to_relative_path)
+                
         except Exception as e:
-            print(f"Warning: Stored images loading failed: {e}")
+            st.warning(f"⚠️ Stored images loading failed: {e}")
             stored_images_df = pd.DataFrame()
         
-        # ------------------------------
-        # 📦 Package all data into a dictionary
-        # ------------------------------
         data_dict = {
             'batch_predictions': batch_predictions_df,
             'batch_regions': batch_regions_df,
@@ -246,7 +237,6 @@ def load_mri_data_optimized(force_refresh=False):
             'total_records': len(batch_predictions_df) + len(batch_regions_df) + len(stored_images_df)
         }
         
-        # Track and store performance metrics in session state
         load_time = time.time() - start_time
         if 'performance_metrics' not in st.session_state:
             st.session_state.performance_metrics = {}
@@ -256,8 +246,8 @@ def load_mri_data_optimized(force_refresh=False):
         return data_dict
         
     except Exception as e:
-        # Handle major loading failures gracefully
         st.error(f"❌ Data loading error: {str(e)}")
+        st.info("💡 Make sure the database file exists in: Alzheimer_Database/alzheimer_predictions.db")
         return {
             'batch_predictions': pd.DataFrame(),
             'batch_regions': pd.DataFrame(),
@@ -266,11 +256,74 @@ def load_mri_data_optimized(force_refresh=False):
             'total_records': 0
         }
     finally:
-        # Ensure storage connection is closed
         try:
             storage.close()
         except:
             pass
+
+# Continue with rest of your dashboard code...
+# (The rest of the code remains the same as your original)
+
+# ------------------------------
+# 🔍 IMAGE DISPLAY HELPER - GITHUB AWARE
+# ------------------------------
+
+def display_image_from_db(image_data, caption="Image"):
+    """Display image with GitHub repository path support"""
+    if image_data:
+        try:
+            from PIL import Image
+            import base64
+            from io import BytesIO
+            
+            # Strategy 1: Relative path in GitHub repo
+            if isinstance(image_data, str) and not image_data.startswith('data:'):
+                project_root = get_project_root()
+                full_path = project_root / image_data
+                
+                if full_path.exists():
+                    st.image(str(full_path), caption=caption, use_container_width=True)
+                    return True
+                else:
+                    st.error(f"❌ Image not found: {image_data}")
+                    return False
+            
+            # Strategy 2: Data URL
+            elif isinstance(image_data, str) and image_data.startswith('data:image'):
+                st.image(image_data, caption=caption, use_container_width=True)
+                return True
+            
+            # Other strategies remain the same...
+            
+        except Exception as e:
+            st.error(f"❌ Error displaying image: {str(e)}")
+            return False
+    return False
+
+# Main data loading
+with st.spinner("🔄 Loading dashboard data..."):
+    data_load_start = time.time()
+    data_dict = load_mri_data_optimized()
+    
+    df_predictions = data_dict.get('batch_predictions', pd.DataFrame())
+    df_regions = data_dict.get('batch_regions', pd.DataFrame())
+    df_images = data_dict.get('stored_images', pd.DataFrame())
+    
+    data_load_time = time.time() - data_load_start
+    load_timestamp = data_dict.get('load_timestamp', datetime.now())
+    total_records = data_dict.get('total_records', 0)
+
+# Display connection status
+if total_records > 0:
+    st.success(f"✅ Connected to database | {total_records} records loaded")
+else:
+    st.warning("⚠️ No data found in database")
+
+
+
+
+
+
 
 
 # Image caching 
