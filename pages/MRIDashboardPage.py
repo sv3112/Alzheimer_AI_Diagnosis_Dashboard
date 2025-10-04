@@ -160,9 +160,52 @@ def load_mri_data_optimized(force_refresh=False):
         # Create storage handler
         storage = AlzheimerPredictionStorage()
         
-        # Load predictions
+        # Debug: Check what tables exist in the database
+        import sqlite3
+        conn = sqlite3.connect('alzheimer_predictions.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()
+        
+        # Debug: Check row counts for each table
+        table_info = {}
+        for table in tables:
+            table_name = table[0]
+            cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+            count = cursor.fetchone()[0]
+            table_info[table_name] = count
+        
+        conn.close()
+        
+        # Load predictions with better error handling
         batch_predictions_raw = storage.get_batch_predictions()
-        batch_predictions_df = pd.DataFrame(batch_predictions_raw) if batch_predictions_raw else pd.DataFrame()
+        
+        # Handle different return types
+        if batch_predictions_raw:
+            if isinstance(batch_predictions_raw, pd.DataFrame):
+                batch_predictions_df = batch_predictions_raw
+            elif isinstance(batch_predictions_raw, list) and len(batch_predictions_raw) > 0:
+                # Check if it's a list of dicts or list of tuples
+                if isinstance(batch_predictions_raw[0], dict):
+                    batch_predictions_df = pd.DataFrame(batch_predictions_raw)
+                else:
+                    # It's likely tuples - need to get column names from cursor
+                    cursor.execute("PRAGMA table_info(batch_predictions)")
+                    columns = [col[1] for col in cursor.fetchall()]
+                    batch_predictions_df = pd.DataFrame(batch_predictions_raw, columns=columns)
+            else:
+                batch_predictions_df = pd.DataFrame()
+        else:
+            batch_predictions_df = pd.DataFrame()
+        
+        # Debug info
+        debug_info = {
+            'tables': table_info,
+            'predictions_raw_type': type(batch_predictions_raw).__name__,
+            'predictions_raw_count': len(batch_predictions_raw) if batch_predictions_raw else 0,
+            'predictions_df_shape': batch_predictions_df.shape if not batch_predictions_df.empty else (0, 0),
+            'predictions_df_columns': list(batch_predictions_df.columns) if not batch_predictions_df.empty else []
+        }
         
         # Clean confidence values
         if not batch_predictions_df.empty and 'Confidence' in batch_predictions_df.columns:
@@ -186,9 +229,23 @@ def load_mri_data_optimized(force_refresh=False):
                 if col in batch_predictions_df.columns:
                     batch_predictions_df[col] = pd.to_numeric(batch_predictions_df[col], errors='coerce').fillna(0)
         
-        # Load regions
+        # Load regions with better error handling
         batch_regions_raw = storage.get_batch_region()
-        batch_regions_df = pd.DataFrame(batch_regions_raw) if batch_regions_raw else pd.DataFrame()
+        
+        if batch_regions_raw:
+            if isinstance(batch_regions_raw, pd.DataFrame):
+                batch_regions_df = batch_regions_raw
+            elif isinstance(batch_regions_raw, list) and len(batch_regions_raw) > 0:
+                if isinstance(batch_regions_raw[0], dict):
+                    batch_regions_df = pd.DataFrame(batch_regions_raw)
+                else:
+                    cursor.execute("PRAGMA table_info(batch_region)")
+                    columns = [col[1] for col in cursor.fetchall()]
+                    batch_regions_df = pd.DataFrame(batch_regions_raw, columns=columns)
+            else:
+                batch_regions_df = pd.DataFrame()
+        else:
+            batch_regions_df = pd.DataFrame()
         
         if not batch_regions_df.empty:
             numeric_cols = ['ScoreCAM_Importance_Score', 'ScoreCAM_Importance_Percentage']
@@ -200,21 +257,40 @@ def load_mri_data_optimized(force_refresh=False):
         stored_images_raw = storage.get_stored_images()
         stored_images_df = pd.DataFrame(stored_images_raw) if stored_images_raw else pd.DataFrame()
         
-        # Fix image paths to be absolute
+        # Fix image paths to work with repository structure
         if not stored_images_df.empty and 'file_path' in stored_images_df.columns:
             def fix_image_path(path_str):
                 if not path_str:
                     return path_str
+                
+                # If it's already a valid absolute path, use it
                 p = Path(path_str)
                 if p.is_absolute() and p.exists():
                     return str(p)
-                # Try relative to database directory
-                abs_path = DB_DIR / path_str
-                if abs_path.exists():
-                    return str(abs_path)
+                
+                # Extract just the filename from the path
+                filename = Path(path_str).name
+                
+                # Look for the file in stored_images directory
+                stored_images_dir = DB_DIR / 'stored_images'
+                if stored_images_dir.exists():
+                    image_path = stored_images_dir / filename
+                    if image_path.exists():
+                        return str(image_path)
+                
+                # Try direct path relative to database directory
+                rel_path = DB_DIR / path_str
+                if rel_path.exists():
+                    return str(rel_path)
+                
+                # Return original if nothing works (will show error in display)
                 return path_str
             
             stored_images_df['file_path'] = stored_images_df['file_path'].apply(fix_image_path)
+            
+            # Add debug: count how many images actually exist
+            debug_info['images_found'] = stored_images_df['file_path'].apply(lambda x: Path(x).exists()).sum()
+            debug_info['images_total'] = len(stored_images_df)
         
         storage.close()
         
@@ -224,7 +300,8 @@ def load_mri_data_optimized(force_refresh=False):
             'stored_images': stored_images_df,
             'load_timestamp': datetime.now(),
             'total_records': len(batch_predictions_df) + len(batch_regions_df) + len(stored_images_df),
-            'error': None
+            'error': None,
+            'debug_info': debug_info
         }
         
     except Exception as e:
