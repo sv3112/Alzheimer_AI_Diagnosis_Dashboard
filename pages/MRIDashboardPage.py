@@ -33,19 +33,13 @@ def get_database_directory():
     """Find the Alzheimer_Database directory in the repository"""
     current_file = Path(__file__).resolve()
     
-    # Strategy 1: Check parent directories (for files in subfolders like 'pages')
-    for parent in list(current_file.parents):
-        db_dir = parent / 'Alzheimer_Database'
-        if db_dir.exists() and (db_dir / 'alzheimer_predictions.db').exists():
-            return db_dir
-    
-    # Strategy 2: Check Alzheimer_Project folder structure
+    # Strategy 1: Check Alzheimer_Project folder structure
     for parent in list(current_file.parents):
         db_dir = parent / 'Alzheimer_Project' / 'Alzheimer_Database'
         if db_dir.exists() and (db_dir / 'alzheimer_predictions.db').exists():
             return db_dir
     
-    # Strategy 3: Look for repository root (has .git folder)
+    # Strategy 2: Look for repository root (has .git folder)
     for parent in list(current_file.parents):
         if (parent / '.git').exists():
             db_dir = parent / 'Alzheimer_Database'
@@ -157,8 +151,8 @@ def load_mri_data_optimized(force_refresh=False):
         # Change to database directory
         os.chdir(str(DB_DIR))
         
-        # Create storage handler
-        storage = AlzheimerPredictionStorage()
+        # Create storage handler with explicit base directory
+        storage = AlzheimerPredictionStorage(base_dir=str(DB_DIR))
         
         # Load predictions
         batch_predictions_raw = storage.get_batch_predictions()
@@ -220,7 +214,7 @@ def load_mri_data_optimized(force_refresh=False):
         
         return {
             'batch_predictions': batch_predictions_df,
-            'batch_regions': batch_regions_df,
+            'batch_regions': batch_regions_df,  # FIXED: Changed from 'region_predictions'
             'stored_images': stored_images_df,
             'load_timestamp': datetime.now(),
             'total_records': len(batch_predictions_df) + len(batch_regions_df) + len(stored_images_df),
@@ -230,7 +224,7 @@ def load_mri_data_optimized(force_refresh=False):
     except Exception as e:
         return {
             'batch_predictions': pd.DataFrame(),
-            'batch_regions': pd.DataFrame(),
+            'batch_regions': pd.DataFrame(),  # FIXED: Changed from 'region_predictions'
             'stored_images': pd.DataFrame(),
             'load_timestamp': datetime.now(),
             'total_records': 0,
@@ -349,7 +343,7 @@ with st.spinner("Loading dashboard data..."):
     data_dict = load_mri_data_optimized()
     
     df_predictions = data_dict.get('batch_predictions', pd.DataFrame())
-    df_regions = data_dict.get('batch_regions', pd.DataFrame())
+    df_regions = data_dict.get('batch_regions', pd.DataFrame())  # FIXED: Changed from 'region_predictions'
     df_images = data_dict.get('stored_images', pd.DataFrame())
     total_records = data_dict.get('total_records', 0)
     error = data_dict.get('error')
@@ -381,8 +375,15 @@ else:
     st.warning("No data found in database")
     st.stop()
 
-# Continue with your existing visualization code from here...
-# All the metrics, tabs, and analysis sections remain exactly the same
+# Add debug display to verify data loaded correctly
+with st.expander("Data Loading Summary"):
+    st.write(f"**Batch Predictions:** {len(df_predictions)} records")
+    st.write(f"**Brain Regions:** {len(df_regions)} records")
+    st.write(f"**Stored Images:** {len(df_images)} records")
+    
+    if not df_regions.empty:
+        st.write("\n**Sample Region Data:**")
+        st.dataframe(df_regions.head())
 
 @st.cache_data(ttl=60)
 def calculate_metrics_fast(df_predictions):
@@ -1235,17 +1236,30 @@ elif st.session_state.selected_tab == "🧬 Individual Patient Analysis":
                         risk_level = "High"
 
                     # Display clinical narrative inside a styled info box
+                    # 🧠 Display clinical narrative inside a styled info box
+                    clean_narrative = (
+                        narrative.replace('<br>', '\n')
+                                .replace('<p>', '')
+                                .replace('</p>', '')
+                                .replace('\\n\\n', '\n')
+                                .strip()
+                    )
+
                     st.markdown(f"""
                     <div style="
                         background: {status_color}10;
                         border-left: 4px solid {status_color};
-                        padding: 12px;
+                        padding: 12px 16px;
                         border-radius: 8px;
                         font-weight: 500;
+                        line-height: 1.6;
+                        color: #374151;
+                        white-space: pre-wrap;
                     ">
-                        <span style="color: #374151;">{narrative.replace('<br>', '').replace('<p>', '').replace('</p>', '').replace('\\n\\n', '\\n')}</span>
+                        {clean_narrative}
                     </div>
                     """, unsafe_allow_html=True)
+
                             
                 except Exception as e:
                     # Display a styled error box if narrative generation fails
@@ -1923,13 +1937,32 @@ elif st.session_state.selected_tab == "🧬 Individual Patient Analysis":
                                                 )
 
                                                 # Render the explanation in a styled box with gradient background
+                                               # Step 1: Clean the explanation outside the f-string
+                                                clean_explanation = (
+                                                    explanation.replace('<br>', '\n')
+                                                            .replace('<p>', '')
+                                                            .replace('</p>', '')
+                                                            .replace('\\n\\n', '\n')  # handle literal \n\n
+                                                            .strip()
+                                                )
+
+                                                # Step 2: Use the cleaned string in the f-string safely
                                                 st.markdown(f"""
-                                                <div style="background: linear-gradient(135deg, #f0f9ff 0%, #dbeafe 100%); 
-                                                            border-radius: 15px; padding: 1.5rem; border-left: 4px solid #3b82f6;">
-                                                    <h5 style="color: #1e40af; margin-bottom: 1rem;">📍 {selected_region} Clinical Analysis</h5>
-                                                    <div style="color: #475569; line-height: 1.6;">{explanation.replace('<br>', '').replace('<p>', '').replace('</p>', '').replace('\\n\\n', '\\n')}</div>
+                                                <div style="
+                                                    background: linear-gradient(135deg, #f0f9ff 0%, #dbeafe 100%);
+                                                    border-radius: 15px;
+                                                    padding: 1.5rem;
+                                                    border-left: 4px solid #3b82f6;
+                                                ">
+                                                    <h5 style="color: #1e40af; margin-bottom: 1rem;">
+                                                        📍 {selected_region} Clinical Analysis
+                                                    </h5>
+                                                    <div style="color: #475569; line-height: 1.6; white-space: pre-wrap;">
+                                                        {clean_explanation}
+                                                    </div>
                                                 </div>
                                                 """, unsafe_allow_html=True)
+
 
                                             with col2:
                                                 # Retrieve additional clinical insights related to the selected brain region

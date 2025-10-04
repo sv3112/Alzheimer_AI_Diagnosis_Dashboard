@@ -33,8 +33,7 @@ class AlzheimerPredictionStorage:
         """
         # Use relative path if no base_dir provided
         if base_dir is None:
-            BASE_DIR = Path(__file__).resolve().parent.parent  # Project root
-            self.base_dir = BASE_DIR / "Alzheimer_Database"
+            self.base_dir = Path.cwd() / "Alzheimer_Project" / "Alzheimer_Database"
         else:
             self.base_dir = Path(base_dir)
         

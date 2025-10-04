@@ -83,6 +83,38 @@ st.set_page_config(
 )
 
 # ============================================================
+# 📍 DATABASE PATH SETUP
+# ============================================================
+# Add this near the top of your file, after imports
+
+# ============================================================
+# 📍 DATABASE PATH SETUP
+# ============================================================
+def get_database_directory():
+    """Find the Alzheimer_Database directory"""
+    current_file = Path(__file__).resolve()
+    
+    # Check Alzheimer_Project folder structure
+    for parent in list(current_file.parents):
+        db_dir = parent / 'Alzheimer_Project' / 'Alzheimer_Database'
+        if db_dir.exists() and (db_dir / 'alzheimer_predictions.db').exists():
+            return db_dir
+    
+    # Fallback
+    return current_file.parent / 'Alzheimer_Project' / 'Alzheimer_Database'
+
+# Set database paths
+DB_DIR = get_database_directory()
+DB_PATH = DB_DIR / 'alzheimer_predictions.db'
+
+# Verify database exists
+if not DB_PATH.exists():
+    st.error(f"Database not found at: {DB_PATH}")
+    st.stop()
+else:
+    print(f"✓ Found database at: {DB_PATH}")
+
+# ============================================================
 # 🎞 LOTTIE ANIMATION HELPERS
 # ============================================================
 
@@ -111,11 +143,25 @@ def load_local_brain():
     Returns:
         dict | None: Lottie JSON or None if file not found.
     """
+    # Try multiple possible locations
+    possible_paths = [
+        "/Users/swehavenkateshwari/Alzheimer/lottie_brain.json",
+        Path(__file__).parent / "lottie_brain.json",
+        Path(__file__).parent / "assets" / "lottie_brain.json"
+    ]
+    
+    for path in possible_paths:
+        try:
+            with open(path, "r") as f:
+                return json.load(f)
+        except:
+            continue
+    
+    # If no local file found, try loading from URL
     try:
-        with open("/Users/swehavenkateshwari/Alzheimer/lottie_brain.json", "r") as f:
-            return json.load(f)
-    except Exception as e:
-        st.sidebar.warning(f"Could not load brain animation: {e}")
+        brain_url = "https://assets5.lottiefiles.com/packages/lf20_touohxv0.json"
+        return load_lottie_url(brain_url)
+    except:
         return None
 
 # ============================================================
@@ -127,6 +173,9 @@ st.markdown("""
     <p class="hero-subtitle">Advanced Machine Learning Analysis with SHAP Interpretability</p>
 </div>
 """, unsafe_allow_html=True)
+
+# Show database connection status
+st.success(f"Connected to database: {DB_DIR.name}")
 
 # ============================================================
 # 📥 LOAD MODEL COMPONENTS
@@ -198,6 +247,7 @@ def load_model_components():
 # ============================================================
 # 📊 LOAD DASHBOARD DATA FROM DATABASE
 # ============================================================
+@st.cache_data(ttl=300)
 def load_dashboard_data():
     """
     Load predictions and global feature importance from the database.
@@ -208,14 +258,16 @@ def load_dashboard_data():
             'Global_Feature_Importance': DataFrame of global SHAP feature importance
         }
     """
-    storage = AlzheimerPredictionStorage()
+    # CRITICAL FIX: Pass base_dir explicitly to avoid creating new database
+    storage = AlzheimerPredictionStorage(base_dir=str(DB_DIR))
     try:
         individual_predictions = pd.DataFrame(storage.get_individual_predictions())
         global_importance = pd.DataFrame(storage.get_global_importance())
         
         return {
             'Individual_Predictions': individual_predictions,
-            'Global_Feature_Importance': global_importance
+            'Global_Feature_Importance': global_importance,
+            'record_count': len(individual_predictions) + len(global_importance)
         }
     finally:
         storage.close()
@@ -223,10 +275,17 @@ def load_dashboard_data():
 # ============================================================
 # 📂 INITIAL DATA LOAD
 # ============================================================
-data_dict = load_dashboard_data()
-df_predictions = data_dict.get('Individual_Predictions', pd.DataFrame())
-df_global_importance = data_dict.get('Global_Feature_Importance', pd.DataFrame())
+with st.spinner("Loading clinical data from database..."):
+    data_dict = load_dashboard_data()
+    df_predictions = data_dict.get('Individual_Predictions', pd.DataFrame())
+    df_global_importance = data_dict.get('Global_Feature_Importance', pd.DataFrame())
+    record_count = data_dict.get('record_count', 0)
 
+# Show data loading status
+if record_count > 0:
+    st.info(f"Loaded {len(df_predictions)} patient predictions and {len(df_global_importance)} feature importance records")
+else:
+    st.warning("No clinical data found in database. Please upload patient data first.")
 # ============================================================
 # 🎛 SIDEBAR FILTERS & DEMOGRAPHICS
 # ============================================================
