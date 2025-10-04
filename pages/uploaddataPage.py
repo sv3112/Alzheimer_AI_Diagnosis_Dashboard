@@ -138,26 +138,110 @@ CLASS_NAMES = ['Mild Demented', 'Moderate Demented', 'Non Demented', 'Very Mild 
 # 🔧 Load utilities once at module level
 # ------------------------------
 @st.cache_resource
+# Add this function to download utility files from GitHub
+def download_utilities_from_github():
+    """Download utility files from GitHub repository if they don't exist locally"""
+    
+    # GitHub raw content base URL
+    GITHUB_RAW_URL = "https://raw.githubusercontent.com/sv3112/Alzheimer_AI_Diagnosis_Dashboard/main"
+    
+    # List of utility files to download
+    UTILITY_FILES = [
+        'shap_utils.py',
+        'scorecam.py'
+    ]
+    
+    # Ensure the base directory exists
+    BASE_DIR.mkdir(exist_ok=True, parents=True)
+    
+    # Create SSL context
+    ssl_context = ssl.create_default_context()
+    
+    print(f"📥 Checking utility files in: {BASE_DIR}")
+    
+    for filename in UTILITY_FILES:
+        local_path = BASE_DIR / filename
+        
+        # Skip if file already exists
+        if local_path.exists():
+            print(f"✅ {filename} already exists")
+            continue
+        
+        # Download from GitHub
+        github_url = f"{GITHUB_RAW_URL}/{filename}"
+        print(f"📥 Downloading {filename} from GitHub...")
+        
+        try:
+            with urllib.request.urlopen(github_url, context=ssl_context) as response:
+                with open(local_path, 'wb') as out_file:
+                    out_file.write(response.read())
+            print(f"✅ Downloaded {filename}")
+        except Exception as e:
+            print(f"❌ Failed to download {filename}: {str(e)}")
+            # Don't raise for utility files, allow graceful degradation
+            if filename == 'scorecam.py':
+                print(f"⚠️ ScoreCAM functionality will be unavailable")
+
+
+# Update load_utilities() function
+@st.cache_resource
 def load_utilities():
     """Load and cache SHAP utilities for explainability"""
-    spec = importlib.util.spec_from_file_location("shap_utility", SHAP_UTILITY_PATH)
-    shap_utility = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(shap_utility)
-    return shap_utility
+    try:
+        # Download utilities from GitHub if not present
+        download_utilities_from_github()
+        
+        # Update path to use BASE_DIR
+        shap_utility_path = BASE_DIR / "shap_utils.py"
+        
+        print(f"Loading SHAP utilities from: {shap_utility_path}")
+        
+        spec = importlib.util.spec_from_file_location("shap_utility", str(shap_utility_path))
+        shap_utility = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(shap_utility)
+        
+        print("✅ SHAP utilities loaded successfully")
+        return shap_utility
+    except Exception as e:
+        print(f"❌ Failed to load SHAP utilities: {str(e)}")
+        st.error(f"❌ Error loading SHAP utilities: {str(e)}")
+        return None
 
+# Load utilities
 shap_utility = load_utilities()
-create_shap_analysis_results = shap_utility.create_shap_analysis_results
+
+# Safely access create_shap_analysis_results
+if shap_utility is not None:
+    create_shap_analysis_results = shap_utility.create_shap_analysis_results
+else:
+    st.error("⚠️ SHAP utilities could not be loaded. Some features may be unavailable.")
+    create_shap_analysis_results = None
 
 # ------------------------------
 # 🧠 ScoreCAM import for MRI explainability
 # ------------------------------
 try:
-    from scorecam import ScoreCAMBrainAnalysis
-    SCORECAM_AVAILABLE = True
-    print("✅ ComprehensiveCAM imported successfully")
+    # Download utilities first (includes scorecam.py)
+    download_utilities_from_github()
+    
+    # Try to import from BASE_DIR
+    scorecam_path = BASE_DIR / "scorecam.py"
+    
+    if scorecam_path.exists():
+        spec = importlib.util.spec_from_file_location("scorecam", str(scorecam_path))
+        scorecam_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(scorecam_module)
+        
+        ScoreCAMBrainAnalysis = scorecam_module.ScoreCAMBrainAnalysis
+        SCORECAM_AVAILABLE = True
+        print("✅ ScoreCAM imported successfully")
+    else:
+        raise ImportError("scorecam.py not found")
+        
 except ImportError as e:
-    print(f"❌ Failed to import ComprehensiveCAM: {e}")
+    print(f"❌ Failed to import ScoreCAM: {e}")
     SCORECAM_AVAILABLE = False
+    ScoreCAMBrainAnalysis = None
 
 # ------------------------------
 # 🎨 Apply custom CSS styles
