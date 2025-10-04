@@ -14,3 +14,8 @@ streamlit-lottie==0.0.5
 tensorflow==2.20.0
 opencv-python-headless==4.10.0.84
 boto3
+catboost
+keras
+joblib
+psycopg2-binary
+sqlalchemy
