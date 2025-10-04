@@ -77,7 +77,15 @@ from alzheimers_db_setup import AlzheimerPredictionStorage
 import urllib.request
 import ssl
 
-# Add this function before load_csv_models()
+BASE_DIR = Path("/tmp/alzheimer_app")
+BASE_DIR.mkdir(exist_ok=True, parents=True)
+
+MODEL_DIR = BASE_DIR / "alzheimers_model_files"
+MODEL_DIR.mkdir(exist_ok=True, parents=True)
+
+IMG_SIZE = 331
+CLASS_NAMES = ['Mild Demented', 'Moderate Demented', 'Non Demented', 'Very Mild Demented']
+
 def download_models_from_github():
     """Download model files from GitHub repository if they don't exist locally"""
     
@@ -125,20 +133,6 @@ def download_models_from_github():
     print("✅ All model files ready")
 
 
-# Update the load_csv_models() function
-
-
-# ------------------------------
-# 🖼️ Image analysis constants
-# ------------------------------
-IMG_SIZE = 331
-CLASS_NAMES = ['Mild Demented', 'Moderate Demented', 'Non Demented', 'Very Mild Demented']
-
-# ------------------------------
-# 🔧 Load utilities once at module level
-# ------------------------------
-@st.cache_resource
-# Add this function to download utility files from GitHub
 def download_utilities_from_github():
     """Download utility files from GitHub repository if they don't exist locally"""
     
@@ -182,8 +176,9 @@ def download_utilities_from_github():
             if filename == 'scorecam.py':
                 print(f"⚠️ ScoreCAM functionality will be unavailable")
 
-
-# Update load_utilities() function
+# ------------------------------
+# 🔧 Load utilities once at module level
+# ------------------------------
 @st.cache_resource
 def load_utilities():
     """Load and cache SHAP utilities for explainability"""
@@ -195,6 +190,9 @@ def load_utilities():
         shap_utility_path = BASE_DIR / "shap_utils.py"
         
         print(f"Loading SHAP utilities from: {shap_utility_path}")
+        
+        if not shap_utility_path.exists():
+            raise FileNotFoundError(f"shap_utils.py not found at {shap_utility_path}")
         
         spec = importlib.util.spec_from_file_location("shap_utility", str(shap_utility_path))
         shap_utility = importlib.util.module_from_spec(spec)
@@ -214,16 +212,13 @@ shap_utility = load_utilities()
 if shap_utility is not None:
     create_shap_analysis_results = shap_utility.create_shap_analysis_results
 else:
-    st.error("⚠️ SHAP utilities could not be loaded. Some features may be unavailable.")
+    st.warning("⚠️ SHAP utilities could not be loaded. Some features may be unavailable.")
     create_shap_analysis_results = None
 
 # ------------------------------
 # 🧠 ScoreCAM import for MRI explainability
 # ------------------------------
 try:
-    # Download utilities first (includes scorecam.py)
-    download_utilities_from_github()
-    
     # Try to import from BASE_DIR
     scorecam_path = BASE_DIR / "scorecam.py"
     
@@ -242,6 +237,19 @@ except ImportError as e:
     print(f"❌ Failed to import ScoreCAM: {e}")
     SCORECAM_AVAILABLE = False
     ScoreCAMBrainAnalysis = None
+
+
+# Update the load_csv_models() function
+
+
+# ------------------------------
+# 🖼️ Image analysis constants
+# ------------------------------
+
+# ------------------------------
+# 🔧 Load utilities once at module level
+# ------------------------------
+
 
 # ------------------------------
 # 🎨 Apply custom CSS styles
