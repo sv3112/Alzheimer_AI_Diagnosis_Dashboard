@@ -33,11 +33,28 @@ def get_database_directory():
     """Find the Alzheimer_Database directory in the repository"""
     current_file = Path(__file__).resolve()
     
-    # Check current directory and parent directories
-    for parent in [current_file.parent] + list(current_file.parents):
+    # Strategy 1: Check parent directories (for files in subfolders like 'pages')
+    for parent in list(current_file.parents):
         db_dir = parent / 'Alzheimer_Database'
         if db_dir.exists() and (db_dir / 'alzheimer_predictions.db').exists():
             return db_dir
+    
+    # Strategy 2: Check Alzheimer_Project folder structure
+    for parent in list(current_file.parents):
+        db_dir = parent / 'Alzheimer_Project' / 'Alzheimer_Database'
+        if db_dir.exists() and (db_dir / 'alzheimer_predictions.db').exists():
+            return db_dir
+    
+    # Strategy 3: Look for repository root (has .git folder)
+    for parent in list(current_file.parents):
+        if (parent / '.git').exists():
+            db_dir = parent / 'Alzheimer_Database'
+            if db_dir.exists():
+                return db_dir
+            # Also check inside Alzheimer_Project
+            db_dir = parent / 'Alzheimer_Project' / 'Alzheimer_Database'
+            if db_dir.exists():
+                return db_dir
     
     # If not found, return expected location
     return current_file.parent / 'Alzheimer_Database'
@@ -47,7 +64,12 @@ DB_DIR = get_database_directory()
 DB_PATH = DB_DIR / 'alzheimer_predictions.db'
 
 # Add repository root to Python path for imports
-sys.path.insert(0, str(DB_DIR.parent))
+repo_root = DB_DIR.parent
+sys.path.insert(0, str(repo_root))
+
+# Also try Alzheimer_Project if it exists
+if (repo_root / 'Alzheimer_Project').exists():
+    sys.path.insert(0, str(repo_root / 'Alzheimer_Project'))
 
 # Import database storage class
 try:
@@ -335,7 +357,23 @@ with st.spinner("Loading dashboard data..."):
 # Show status
 if error:
     st.error(f"Error loading data: {error}")
-    st.info(f"Database should be at: {DB_PATH}")
+    
+    # Show detailed debugging info
+    with st.expander("Debug Information"):
+        st.write("**Current file location:**", Path(__file__).resolve())
+        st.write("**Looking for database at:**", DB_PATH)
+        st.write("**Database directory:**", DB_DIR)
+        st.write("**Database exists:**", DB_PATH.exists())
+        
+        st.write("\n**Checking parent directories:**")
+        current = Path(__file__).resolve()
+        for i, parent in enumerate(current.parents):
+            st.write(f"Level {i}: {parent}")
+            db_check = parent / 'Alzheimer_Database' / 'alzheimer_predictions.db'
+            st.write(f"  - Has database? {db_check.exists()}")
+            if (parent / '.git').exists():
+                st.write(f"  - Repository root!")
+    
     st.stop()
 elif total_records > 0:
     st.success(f"Connected to database | {total_records} records loaded from {DB_DIR.name}")
@@ -387,7 +425,6 @@ for col, value, label in metrics_data:
 
 st.markdown("Dashboard is now connected to your existing database and images!")
 st.info("The remaining visualization code from your original file continues here...")
-
 # ------------------------------
 # 🗂 Tabs Section
 # ------------------------------
