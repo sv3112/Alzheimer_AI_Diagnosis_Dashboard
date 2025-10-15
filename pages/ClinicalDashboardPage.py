@@ -792,8 +792,7 @@ with tab1:
                 tickfont=dict(size=16, color="white")
             ),
             height=650,
-            plot_bgcolor="#1E1E1E",
-            paper_bgcolor="#1E1E1E",
+            
             font=dict(color="white")
         )
         
