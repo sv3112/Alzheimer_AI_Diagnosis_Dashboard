@@ -425,32 +425,7 @@ with st.spinner("Loading dashboard data..."):
     total_records = data_dict.get('total_records', 0)
     error = data_dict.get('error')
 
-# Show status
-if error:
-    st.error(f"Error loading data: {error}")
-    
-    # Show detailed debugging info
-    with st.expander("Debug Information"):
-        st.write("**Current file location:**", Path(__file__).resolve())
-        st.write("**Looking for database at:**", DB_PATH)
-        st.write("**Database directory:**", DB_DIR)
-        st.write("**Database exists:**", DB_PATH.exists())
-        
-        st.write("\n**Checking parent directories:**")
-        current = Path(__file__).resolve()
-        for i, parent in enumerate(current.parents):
-            st.write(f"Level {i}: {parent}")
-            db_check = parent / 'Alzheimer_Database' / 'alzheimer_predictions.db'
-            st.write(f"  - Has database? {db_check.exists()}")
-            if (parent / '.git').exists():
-                st.write(f"  - Repository root!")
-    
-    st.stop()
-elif total_records > 0:
-    st.success(f"Connected to database | {total_records} records loaded from {DB_DIR.name}")
-else:
-    st.warning("No data found in database")
-    st.stop()
+
 
 
 
