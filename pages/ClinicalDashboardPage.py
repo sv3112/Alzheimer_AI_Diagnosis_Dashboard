@@ -780,20 +780,20 @@ with tab1:
                 categoryorder="total ascending",
                 title=dict(
                     text="<b>Feature</b>",
-                    font=dict(size=18, color="white")
+                    font=dict(size=18, color="black")
                 ),
-                tickfont=dict(size=16, color="white")
+                tickfont=dict(size=16, color="black")
             ),
             xaxis=dict(
                 title=dict(
                     text="<b>Mean Absolute SHAP Value</b>",
-                    font=dict(size=18, color="white")
+                    font=dict(size=18, color="black")
                 ),
-                tickfont=dict(size=16, color="white")
+                tickfont=dict(size=16, color="black")
             ),
             height=650,
             
-            font=dict(color="white")
+            font=dict(color="black")
         )
         
         st.plotly_chart(fig_importance, use_container_width=True)
