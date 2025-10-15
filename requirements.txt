@@ -1,7 +1,7 @@
 # Core dependencies
 streamlit==1.38.0
 pandas==2.2.3
-numpy==1.26.4
+numpy==2.1.0
 
 # Visualization
 matplotlib==3.9.2
@@ -9,13 +9,10 @@ plotly==5.24.1
 seaborn==0.13.2
 streamlit-lottie==0.0.5
 
-# Machine Learning
+# Machine Learning (Python 3.13 compatible only)
 scikit-learn==1.5.2
 xgboost==2.1.1
-catboost==1.2.5
-shap==0.47.2
-tensorflow==2.16.2
-keras==3.3.3
+shap==0.46.0
 joblib==1.4.2
 
 # Utilities
