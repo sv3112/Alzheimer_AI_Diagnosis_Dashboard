@@ -452,15 +452,7 @@ else:
     st.warning("No data found in database")
     st.stop()
 
-# Add debug display to verify data loaded correctly
-with st.expander("Data Loading Summary"):
-    st.write(f"**Batch Predictions:** {len(df_predictions)} records")
-    st.write(f"**Brain Regions:** {len(df_regions)} records")
-    st.write(f"**Stored Images:** {len(df_images)} records")
-    
-    if not df_regions.empty:
-        st.write("\n**Sample Region Data:**")
-        st.dataframe(df_regions.head())
+
 
 @st.cache_data(ttl=60)
 def calculate_metrics_fast(df_predictions):
