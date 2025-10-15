@@ -770,27 +770,29 @@ with tab1:
         fig_importance.update_layout(
           title=dict(
               text="✨ <b>Feature Importance Analysis</b>",
-              x=0.5
+              x=0.5,
+              xanchor="center",
+              font=dict(color="white", size=20)
           ),
           yaxis=dict(
-              categoryorder='total ascending',
+              categoryorder="total ascending",
               title=dict(
-                  text='<b>Feature</b>',
-                  font=dict(size=18, color='white')
+                  text="<b>Feature</b>",
+                  font=dict(size=18, color="white")
               ),
-              tickfont=dict(size=16, color='white')
+              tickfont=dict(size=16, color="white")
           ),
           xaxis=dict(
               title=dict(
-                  text='<b>Mean Absolute SHAP Value</b>',
-                  font=dict(size=18, color='white')
+                  text="<b>Mean Absolute SHAP Value</b>",
+                  font=dict(size=18, color="white")
               ),
-              tickfont=dict(size=16, color='white')
+              tickfont=dict(size=16, color="white")
           ),
           height=650,
-          plot_bgcolor='#1E1E1E',   # dark background to make white font pop
-          paper_bgcolor='#1E1E1E',  # keep consistent background
-          font=dict(color='white')  # default text color
+          plot_bgcolor="#1E1E1E",
+          paper_bgcolor="#1E1E1E",
+          font=dict(color="white")
       )
       
       st.plotly_chart(fig_importance, use_container_width=True)
