@@ -19,3 +19,5 @@ keras
 joblib
 psycopg2-binary
 sqlalchemy
+plotly==5.24.1
+streamlit==1.38.0
