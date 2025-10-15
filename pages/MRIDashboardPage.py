@@ -468,8 +468,7 @@ for col, value, label in metrics_data:
         </div>
         """, unsafe_allow_html=True)
 
-st.markdown("Dashboard is now connected to your existing database and images!")
-st.info("The remaining visualization code from your original file continues here...")
+
 # ------------------------------
 # 🗂 Tabs Section
 # ------------------------------
