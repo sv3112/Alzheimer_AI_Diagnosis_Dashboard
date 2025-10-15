@@ -1,25 +1,21 @@
-# Core dependencies
-streamlit==1.38.0
+streamlit==1.46.0
 pandas==2.2.3
-numpy==2.1.0
-
-# Visualization
-matplotlib==3.9.2
-plotly==5.24.1
+numpy>=2.1.0
+matplotlib==3.10.0
+plotly==6.1.2
+scikit-learn==1.6.0
 seaborn==0.13.2
-streamlit-lottie==0.0.5
-
-# Machine Learning (Python 3.13 compatible only)
-scikit-learn==1.5.2
-xgboost==2.1.1
-shap==0.46.0
-joblib==1.4.2
-
-# Utilities
 openpyxl==3.1.5
-pillow==10.4.0
-requests==2.32.3
-boto3==1.35.34
-psycopg2-binary==2.9.9
-sqlalchemy==2.0.34
+pillow==11.0.0
+requests==2.31.0
+xgboost==3.0.2
+shap==0.47.2
+streamlit-lottie==0.0.5
+tensorflow==2.20.0
 opencv-python-headless==4.10.0.84
+boto3
+catboost
+keras
+joblib
+psycopg2-binary
+sqlalchemy
