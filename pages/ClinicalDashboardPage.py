@@ -743,8 +743,6 @@ with tab1:
             st.markdown(f"<div class='feature-item'><span>{feature_icon}</span> <b>{feature}</b></div>", unsafe_allow_html=True)
 
     # ---------------------------------------------------------
-    # 5️⃣ Top Feature Importance (SHAP Values)
-    # ---------------------------------------------------------
     # ---------------------------------------------------------
     # 5️⃣ Top Feature Importance (SHAP Values)
     # ---------------------------------------------------------
