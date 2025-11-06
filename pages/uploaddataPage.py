@@ -421,8 +421,7 @@ if st.session_state.data_type == 'csv':
             col1, col2 = st.columns(2)
             with col1:
                 patient_id = st.text_input("Patient ID*", placeholder="e.g., P001", help="Unique identifier for the patient")
-            with col2:
-                patient_name = st.text_input("Patient Name (Optional)", placeholder="e.g., John Doe")
+            
             
             st.markdown("#### 📊 Clinical Features")
             st.markdown("Please enter all required clinical measurements:")
