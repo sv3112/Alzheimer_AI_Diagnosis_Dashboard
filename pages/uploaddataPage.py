@@ -485,8 +485,8 @@ if st.session_state.data_type == 'csv':
                             # Create prediction data with patient info
                             prediction_data = {
                                 'Patient_ID': patient_id,
-                                'Prediction': int(prediction),
-                                'Probability': float(probability),
+                                'Predicted_Diagnosis': int(prediction),
+                                'Prediction_Probability': float(probability),
                                 'Timestamp': datetime.now().isoformat()
                             }
                             
