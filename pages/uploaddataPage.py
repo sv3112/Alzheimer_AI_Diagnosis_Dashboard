@@ -421,8 +421,7 @@ if st.session_state.data_type == 'csv':
             col1, col2 = st.columns(2)
             with col1:
                 patient_id = st.text_input("Patient ID*", placeholder="e.g., P001", help="Unique identifier for the patient")
-            with col2:
-                patient_name = st.text_input("Patient Name (Optional)", placeholder="e.g., John Doe")
+            
             
             st.markdown("#### 📊 Clinical Features")
             st.markdown("Please enter all required clinical measurements:")
@@ -511,7 +510,7 @@ if st.session_state.data_type == 'csv':
                             # Create prediction data with patient info
                             prediction_data = {
                                 'Patient_ID': patient_id,
-                                'Patient_Name': patient_name if patient_name else 'N/A',
+                                
                                 'Prediction': int(prediction),
                                 'Prediction_Confidence': float(probability),  # Changed from 'Probability'
                                 'Timestamp': datetime.now().isoformat()
