@@ -507,27 +507,28 @@ if st.session_state.data_type == 'csv':
                             status_text.text("📋 Step 4/4: Generating comprehensive report...")
                             progress_bar.progress(90)
 
-                            # Create prediction data with patient info
+                            # Create prediction data matching database schema
                             prediction_data = {
                                 'Patient_ID': patient_id,
-                                
-                                'Prediction': int(prediction),
-                                'Prediction_Confidence': float(probability),  # Changed from 'Probability'
-                                'Timestamp': datetime.now().isoformat()
+                                'Predicted_Diagnosis': 'Alzheimer\'s Disease' if prediction == 1 else 'No Alzheimer\'s',
+                                'Prediction_Probability': float(probability),
+                                'Prediction_Confidence': float(probability),
+                                'model_name': 'CatBoost',
+                                'model_version': 'v1'
                             }
                             
-                            # Add all feature values to prediction data
+                            # Add processed feature values (these match top_features)
                             for feature, value in feature_values.items():
-                                prediction_data[feature] = value
+                                prediction_data[feature] = float(value)
 
-                            # Store in database
+                            # Store in database FIRST before SHAP analysis
                             storage.store_individual_prediction(
                                 prediction_data=prediction_data,
                                 model_name='CatBoost',
                                 model_version='v1'
                             )
 
-                            # Create SHAP results
+                            # Create SHAP results (this may add extra columns we don't need for DB)
                             shap_results = create_shap_analysis_results(
                                 shap_values=shap_values,
                                 predictions=np.array([prediction]),
