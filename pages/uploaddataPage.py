@@ -421,10 +421,28 @@ if st.session_state.data_type == 'csv':
             col1, col2 = st.columns(2)
             with col1:
                 patient_id = st.text_input("Patient ID*", placeholder="e.g., P001", help="Unique identifier for the patient")
-            
+            with col2:
+                patient_name = st.text_input("Patient Name (Optional)", placeholder="e.g., John Doe")
             
             st.markdown("#### 📊 Clinical Features")
             st.markdown("Please enter all required clinical measurements:")
+            
+            # Feature descriptions and reasonable ranges
+            feature_info = {
+                'Age': {'min': 0.0, 'max': 120.0, 'default': 65.0, 'step': 1.0, 'help': 'Patient age in years'},
+                'MMSE': {'min': 0.0, 'max': 30.0, 'default': 24.0, 'step': 1.0, 'help': 'Mini-Mental State Examination score (0-30)'},
+                'FunctionalAssessment': {'min': 0.0, 'max': 10.0, 'default': 7.0, 'step': 0.1, 'help': 'Functional assessment score (0-10)'},
+                'ADL': {'min': 0.0, 'max': 10.0, 'default': 7.0, 'step': 0.1, 'help': 'Activities of Daily Living score (0-10)'},
+                'MemoryComplaints': {'min': 0.0, 'max': 1.0, 'default': 0.0, 'step': 1.0, 'help': 'Has memory complaints? (0=No, 1=Yes)'},
+                'BehavioralProblems': {'min': 0.0, 'max': 1.0, 'default': 0.0, 'step': 1.0, 'help': 'Has behavioral problems? (0=No, 1=Yes)'},
+                'Confusion': {'min': 0.0, 'max': 1.0, 'default': 0.0, 'step': 1.0, 'help': 'Shows confusion? (0=No, 1=Yes)'},
+                'Disorientation': {'min': 0.0, 'max': 1.0, 'default': 0.0, 'step': 1.0, 'help': 'Shows disorientation? (0=No, 1=Yes)'},
+                'PersonalityChanges': {'min': 0.0, 'max': 1.0, 'default': 0.0, 'step': 1.0, 'help': 'Has personality changes? (0=No, 1=Yes)'},
+                'DifficultyCompletingTasks': {'min': 0.0, 'max': 1.0, 'default': 0.0, 'step': 1.0, 'help': 'Has difficulty completing tasks? (0=No, 1=Yes)'},
+                'Forgetfulness': {'min': 0.0, 'max': 1.0, 'default': 0.0, 'step': 1.0, 'help': 'Shows forgetfulness? (0=No, 1=Yes)'},
+                'SleepQuality': {'min': 0.0, 'max': 10.0, 'default': 7.0, 'step': 0.1, 'help': 'Sleep quality score (0-10)'},
+                'Diabetes': {'min': 0.0, 'max': 1.0, 'default': 0.0, 'step': 1.0, 'help': 'Has diabetes? (0=No, 1=Yes)'},
+            }
             
             # Create input fields for each feature in top_features
             feature_values = {}
@@ -439,14 +457,22 @@ if st.session_state.data_type == 'csv':
                     if i + j < len(feature_list):
                         feature = feature_list[i + j]
                         with col:
-                            # Create appropriate input based on feature type
-                            # You can customize these based on your actual feature ranges
+                            # Get feature info or use defaults
+                            info = feature_info.get(feature, {
+                                'min': 0.0,
+                                'max': 100.0,
+                                'default': 0.0,
+                                'step': 0.01,
+                                'help': f'Enter value for {feature}'
+                            })
+                            
                             feature_values[feature] = st.number_input(
                                 feature,
-                                value=0.0,
-                                step=0.01,
-                                format="%.2f",
-                                help=f"Enter value for {feature}"
+                                min_value=info['min'],
+                                max_value=info['max'],
+                                value=info['default'],
+                                step=info['step'],
+                                help=info['help']
                             )
             
             st.markdown("---")
@@ -485,9 +511,10 @@ if st.session_state.data_type == 'csv':
                             # Create prediction data with patient info
                             prediction_data = {
                                 'Patient_ID': patient_id,
-                                'Predicted_Diagnosis': int(prediction),
-                                'Prediction_Probability': float(probability)
-                                
+                                'Patient_Name': patient_name if patient_name else 'N/A',
+                                'Prediction': int(prediction),
+                                'Prediction_Confidence': float(probability),  # Changed from 'Probability'
+                                'Timestamp': datetime.now().isoformat()
                             }
                             
                             # Add all feature values to prediction data
