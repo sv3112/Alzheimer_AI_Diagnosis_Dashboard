@@ -421,7 +421,8 @@ if st.session_state.data_type == 'csv':
             col1, col2 = st.columns(2)
             with col1:
                 patient_id = st.text_input("Patient ID*", placeholder="e.g., P001", help="Unique identifier for the patient")
-            
+            with col2:
+                patient_name = st.text_input("Patient Name (Optional)", placeholder="e.g., John Doe")
             
             st.markdown("#### 📊 Clinical Features")
             st.markdown("Please enter all required clinical measurements:")
@@ -514,10 +515,15 @@ if st.session_state.data_type == 'csv':
                                 'Prediction_Probability': float(probability),
                                 'Prediction_Confidence': float(probability),
                                 'model_name': 'CatBoost',
-                                'model_version': 'v1'
+                                'model_version': 'v1',
+                                'RAW_DoctorInCharge': doctor_name if doctor_name else 'Not Specified'
                             }
                             
-                            # Add processed feature values (these match top_features)
+                            # Add all RAW feature values
+                            for feature, value in all_feature_values.items():
+                                prediction_data[feature] = float(value)
+                            
+                            # Add processed feature values (these match top_features used by model)
                             for feature, value in feature_values.items():
                                 prediction_data[feature] = float(value)
 
