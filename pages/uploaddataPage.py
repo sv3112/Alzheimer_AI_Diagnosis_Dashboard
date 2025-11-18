@@ -445,13 +445,12 @@ def create_navigation_section():
                 st.switch_page("home.py")
         
         with subcol2:
-          
-                if st.button("📊 Clinical Dashboard", key="main_dashboard_btn", use_container_width=True,
-                            help="View existing predictions and analytics dashboard"):
-                    st.switch_page("pages/ClinicalDashboardPage.py")
-            else:
-                if st.button("🧠 MRI Dashboard", key="main_mri_dashboard_btn", use_container_width=True,
+          if st.button("📊 Clinical Dashboard", key="main_dashboard_btn", use_container_width=True,
+                    help="View existing predictions and analytics dashboard"):
+              st.switch_page("pages/ClinicalDashboardPage.py")
+          else:
+              if st.button("🧠 MRI Dashboard", key="main_mri_dashboard_btn", use_container_width=True,
                             help="View MRI scan predictions and analytics dashboard"):
-                    st.switch_page("pages/MRIDashboardPage.py")
+                  st.switch_page("pages/MRIDashboardPage.py")
 
 create_navigation_section()
