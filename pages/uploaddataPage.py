@@ -445,7 +445,7 @@ def create_navigation_section():
                 st.switch_page("home.py")
         
         with subcol2:
-            if st.session_state.data_type == 'csv':
+          
                 if st.button("📊 Clinical Dashboard", key="main_dashboard_btn", use_container_width=True,
                             help="View existing predictions and analytics dashboard"):
                     st.switch_page("pages/ClinicalDashboardPage.py")
